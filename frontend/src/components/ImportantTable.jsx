@@ -1,21 +1,42 @@
 import React from "react";
-export default function ImportantTable({ incidents }) {
-  if (!incidents.length) return null;
+import IncidentRow from "./IncidentRow";
+
+function ImportantTable({ incidents, onStatusChange, onDelete, onEdit }) {
 
   return (
-    <>
-      <h2>Important Issues</h2>
-      <table>
+    <div>
+      <h3>Important Incidents</h3>
+
+      <table border="1" cellPadding="5" cellSpacing="0">
+        <thead>
+          <tr>
+            <th>Shift</th>
+            <th>Timestamp</th>
+            <th>Operator</th>
+            <th>Company</th>
+            <th>Category</th>
+            <th>Description</th>
+            <th>Action Taken</th>
+            <th>Status</th>
+            <th>Edit</th>
+            <th>Delete</th>
+          </tr>
+        </thead>
+
         <tbody>
-          {incidents.map(i => (
-            <tr key={i.id}>
-              <td>{i.timestamp}</td>
-              <td>{i.category}</td>
-              <td>{i.description}</td>
-            </tr>
+          {incidents.map((incident) => (
+            <IncidentRow
+              key={incident.id}
+              incident={incident}
+              onStatusChange={onStatusChange}
+              onDelete={onDelete}
+              onEdit={onEdit}
+            />
           ))}
         </tbody>
       </table>
-    </>
+    </div>
   );
 }
+
+export default ImportantTable;

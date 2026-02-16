@@ -1,74 +1,279 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import sqlite3
 from datetime import datetime
-import json
-import os
+import uuid
+from urllib.parse import unquote
 
 app = Flask(__name__)
 CORS(app)
 
-DATA_FILE = "incidents.json"
+DATABASE = "incidents.db"
+
+# =============================
+# INIT DATABASE
+# =============================
+def init_db():
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS companies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS incidents (
+            id TEXT PRIMARY KEY,
+            timestamp TEXT,
+            shift TEXT,
+            category TEXT,
+            company TEXT,
+            description TEXT,
+            action_taken TEXT,
+            status TEXT,
+            operator TEXT
+        )
+    """)
+
+    default_companies = [
+        "Play Play Play",
+        "Lucky Lady",
+        "WiseGang",
+        "Ballerz",
+        "Fast Fortunes"
+    ]
+
+    for company in default_companies:
+        cursor.execute("INSERT OR IGNORE INTO companies (name) VALUES (?)", (company,))
+
+    default_categories = [
+        "Depositos",
+        "Cashouts",
+        "Bonos",
+        "Glitches",
+        "Freeplay"
+    ]
+
+    for category in default_categories:
+        cursor.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", (category,))
+
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# =============================
+# COMPANIES
+# =============================
+@app.route("/companies", methods=["GET"])
+def get_companies():
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM companies ORDER BY name ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return jsonify([row[0] for row in rows])
 
 
-def read_incidents():
-    if not os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "w") as f:
-            json.dump([], f)
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
+@app.route("/companies", methods=["POST"])
+def add_company():
+    data = request.json
+    name = (data.get("name") or "").strip()
+
+    if not name:
+        return jsonify({"error": "Name required"}), 400
+
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR IGNORE INTO companies (name) VALUES (?)", (name,))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Company added"})
 
 
-def write_incidents(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=2)
+@app.route("/companies/<path:name>", methods=["DELETE"])
+def delete_company(name):
+    name = unquote(name).strip()
+
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT COUNT(*) FROM incidents WHERE company = ?", (name,))
+    count = cursor.fetchone()[0]
+
+    if count > 0:
+        conn.close()
+        return jsonify({"error": "IN_USE"}), 400
+
+    cursor.execute("DELETE FROM companies WHERE name = ?", (name,))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Company deleted"})
 
 
+# =============================
+# CATEGORIES
+# =============================
+@app.route("/categories", methods=["GET"])
+def get_categories():
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM categories ORDER BY name ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return jsonify([row[0] for row in rows])
+
+
+@app.route("/categories", methods=["POST"])
+def add_category():
+    data = request.json
+    name = (data.get("name") or "").strip()
+
+    if not name:
+        return jsonify({"error": "Name required"}), 400
+
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", (name,))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Category added"})
+
+
+@app.route("/categories/<path:name>", methods=["DELETE"])
+def delete_category(name):
+    name = unquote(name).strip()
+
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT COUNT(*) FROM incidents WHERE category = ?", (name,))
+    count = cursor.fetchone()[0]
+
+    if count > 0:
+        conn.close()
+        return jsonify({"error": "IN_USE"}), 400
+
+    cursor.execute("DELETE FROM categories WHERE name = ?", (name,))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Category deleted"})
+
+
+# =============================
+# INCIDENTS
+# =============================
 @app.route("/incidents", methods=["GET"])
 def get_incidents():
-    incidents = read_incidents()
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT id, timestamp, shift, category, company,
+               description, action_taken, status, operator
+        FROM incidents
+        ORDER BY timestamp DESC
+    """)
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    incidents = []
+    for row in rows:
+        incidents.append({
+            "id": row[0],
+            "timestamp": row[1],
+            "shift": row[2],
+            "category": row[3],
+            "company": row[4],
+            "description": row[5],
+            "action_taken": row[6],
+            "status": row[7],
+            "operator": row[8]
+        })
+
     return jsonify(incidents)
 
 
 @app.route("/incidents", methods=["POST"])
-def add_incident():
-    incidents = read_incidents()
+def create_incident():
     data = request.json
 
-    new_incident = {
-        "id": str(int(incidents[0]["id"]) + 1) if incidents else "1",
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    incident_id = str(uuid.uuid4())
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO incidents
+        (id, timestamp, shift, category, company,
+         description, action_taken, status, operator)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        incident_id,
+        timestamp,
+        data.get("shift"),
+        data.get("category"),
+        data.get("company"),
+        data.get("description"),
+        data.get("action_taken"),
+        data.get("status", "Pending"),
+        data.get("operator")
+    ))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "id": incident_id,
+        "timestamp": timestamp,
+        "shift": data.get("shift"),
         "category": data.get("category"),
         "company": data.get("company"),
-        "operationCode": data.get("operationCode", ""),
         "description": data.get("description"),
-        "actionTaken": data.get("actionTaken"),
+        "action_taken": data.get("action_taken"),
         "status": data.get("status", "Pending"),
         "operator": data.get("operator")
-    }
-
-    incidents.insert(0, new_incident)
-    write_incidents(incidents)
-
-    return jsonify(new_incident), 201
+    })
 
 
-@app.route("/incidents/<id>", methods=["PUT"])
-def update_incident(id):
-    incidents = read_incidents()
-    for incident in incidents:
-        if incident["id"] == id:
-            incident.update(request.json)
-            write_incidents(incidents)
-            return jsonify(incident)
-    return jsonify({"error": "Not found"}), 404
+@app.route("/incidents/<incident_id>", methods=["PUT"])
+def update_incident(incident_id):
+    data = request.json
+    new_status = data.get("status")
+
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE incidents SET status = ? WHERE id = ?", (new_status, incident_id))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Status updated"})
 
 
-@app.route("/incidents/<id>", methods=["DELETE"])
-def delete_incident(id):
-    incidents = read_incidents()
-    incidents = [i for i in incidents if i["id"] != id]
-    write_incidents(incidents)
-    return "", 204
+@app.route("/incidents/<incident_id>", methods=["DELETE"])
+def delete_incident(incident_id):
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM incidents WHERE id = ?", (incident_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "Incident deleted"})
 
 
 if __name__ == "__main__":

@@ -1,19 +1,32 @@
-import React from "react";
-export default function OperatorGate({ setOperator }) {
-  const submit = e => {
+import React, { useState } from "react";
+
+function OperatorGate({ onLogin }) {
+  const [name, setName] = useState("");
+
+  const handleSubmit = (e) => {
     e.preventDefault();
-    const name = e.target.operator.value.trim();
-    if (name) {
-      sessionStorage.setItem("operator", name);
-      setOperator(name);
+    if (name.trim()) {
+      onLogin(name.trim());
     }
   };
 
   return (
-    <form onSubmit={submit}>
+    <div style={{ textAlign: "center", marginTop: "100px" }}>
       <h2>Enter Operator Name</h2>
-      <input name="operator" required />
-      <button>Continue</button>
-    </form>
+
+      <form onSubmit={handleSubmit}>
+        <input
+          type="text"
+          placeholder="Operator name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
+        <br /><br />
+        <button type="submit">Enter</button>
+      </form>
+    </div>
   );
 }
+
+export default OperatorGate;
