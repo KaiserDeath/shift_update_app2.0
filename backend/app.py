@@ -252,18 +252,43 @@ def create_incident():
     })
 
 
+# 🔥 FIXED UPDATE ROUTE (Only structural change)
 @app.route("/incidents/<incident_id>", methods=["PUT"])
 def update_incident(incident_id):
     data = request.json
-    new_status = data.get("status")
 
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
-    cursor.execute("UPDATE incidents SET status = ? WHERE id = ?", (new_status, incident_id))
+
+    new_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    cursor.execute("""
+        UPDATE incidents
+        SET timestamp = ?,
+            shift = ?,
+            category = ?,
+            company = ?,
+            description = ?,
+            action_taken = ?,
+            status = ?,
+            operator = ?
+        WHERE id = ?
+        """, (
+            new_timestamp,
+            data.get("shift"),
+            data.get("category"),
+            data.get("company"),
+            data.get("description"),
+            data.get("action_taken"),
+            data.get("status"),
+            data.get("operator"),
+            incident_id
+        ))
+
     conn.commit()
     conn.close()
 
-    return jsonify({"message": "Status updated"})
+    return jsonify({"message": "Incident updated"})
 
 
 @app.route("/incidents/<incident_id>", methods=["DELETE"])

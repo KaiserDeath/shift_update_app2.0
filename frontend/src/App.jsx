@@ -31,24 +31,29 @@ function App() {
     setCategories(categoriesData);
   };
 
-  const addIncident = (incident) => {
-    setIncidents(prev => [incident, ...prev]);
-  };
-
-  const updateStatus = async (id, newStatus) => {
-    await fetch(`http://127.0.0.1:5000/incidents/${id}`, {
-      method: "PUT",
+  // ✅ FIXED — Now saves to backend properly
+  const addIncident = async (incident) => {
+    const response = await fetch("http://127.0.0.1:5000/incidents", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: newStatus })
+      body: JSON.stringify(incident)
     });
 
-    setIncidents(prev =>
-      prev.map(incident =>
-        incident.id === id
-          ? { ...incident, status: newStatus }
-          : incident
-      )
-    );
+    const savedIncident = await response.json();
+
+    setIncidents(prev => [savedIncident, ...prev]);
+  };
+
+  // ✅ FIXED — Now sends full object
+  const updateStatus = async (id, newStatus) => {
+    const incident = incidents.find(i => i.id === id);
+
+    const updatedIncident = {
+      ...incident,
+      status: newStatus
+    };
+
+    await updateIncident(updatedIncident);
   };
 
   const deleteIncident = async (id) => {
@@ -63,7 +68,7 @@ function App() {
     );
   };
 
-  // 🔁 FULL UPDATE (for edit form)
+  // 🔁 FULL UPDATE
   const updateIncident = async (updatedIncident) => {
     await fetch(`http://127.0.0.1:5000/incidents/${updatedIncident.id}`, {
       method: "PUT",
@@ -71,13 +76,8 @@ function App() {
       body: JSON.stringify(updatedIncident)
     });
 
-    setIncidents(prev =>
-      prev.map(incident =>
-        incident.id === updatedIncident.id
-          ? updatedIncident
-          : incident
-      )
-    );
+    // Reload from backend to get updated timestamp
+    loadData();
 
     setEditingIncident(null);
   };

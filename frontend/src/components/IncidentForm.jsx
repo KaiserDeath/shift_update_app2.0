@@ -11,14 +11,16 @@ function IncidentForm({
   operator
 }) {
 
-  const [formData, setFormData] = useState({
+  const initialState = {
     shift: "",
     company: "",
     category: "",
     description: "",
     action_taken: "",
     status: "Pending"
-  });
+  };
+
+  const [formData, setFormData] = useState(initialState);
 
   // 🔁 Load data when editing
   useEffect(() => {
@@ -31,13 +33,15 @@ function IncidentForm({
         action_taken: editingIncident.action_taken || "",
         status: editingIncident.status || "Pending"
       });
+    } else {
+      setFormData(initialState);
     }
   }, [editingIncident]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
 
-    // Add new company
+    // ➕ Add new company
     if (name === "company" && value === "ADD_NEW_COMPANY") {
       const newCompany = prompt("Enter new company name:");
       if (!newCompany) return;
@@ -57,7 +61,7 @@ function IncidentForm({
       return;
     }
 
-    // Add new category
+    // ➕ Add new category
     if (name === "category" && value === "ADD_NEW_CATEGORY") {
       const newCategory = prompt("Enter new category name:");
       if (!newCategory) return;
@@ -81,14 +85,7 @@ function IncidentForm({
   };
 
   const resetForm = () => {
-    setFormData({
-      shift: "",
-      company: "",
-      category: "",
-      description: "",
-      action_taken: "",
-      status: "Pending"
-    });
+    setFormData(initialState);
   };
 
   const handleSubmit = (e) => {
@@ -96,35 +93,18 @@ function IncidentForm({
 
     const incidentData = {
       ...formData,
-      operator
+      operator,
+      id: editingIncident?.id
     };
 
-    // 🔁 UPDATE MODE
+    // 🚨 NO FETCH HERE ANYMORE
     if (editingIncident) {
-      fetch(`http://127.0.0.1:5000/incidents/${editingIncident.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(incidentData)
-      })
-      .then(res => res.json())
-      .then(data => {
-        onUpdate(data);
-        resetForm();
-      });
-
+      onUpdate(incidentData);
     } else {
-      // ➕ CREATE MODE
-      fetch("http://127.0.0.1:5000/incidents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(incidentData)
-      })
-      .then(res => res.json())
-      .then(data => {
-        onAdd(data);
-        resetForm();
-      });
+      onAdd(incidentData);
     }
+
+    resetForm();
   };
 
   return (
@@ -170,7 +150,6 @@ function IncidentForm({
             type="button"
             style={{ marginLeft: "10px" }}
             onClick={async () => {
-
               if (!window.confirm("Delete this company?")) return;
 
               const response = await fetch(
@@ -220,7 +199,6 @@ function IncidentForm({
             type="button"
             style={{ marginLeft: "10px" }}
             onClick={async () => {
-
               if (!window.confirm("Delete this category?")) return;
 
               const response = await fetch(
