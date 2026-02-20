@@ -4,6 +4,7 @@ import psycopg2
 from datetime import datetime
 import uuid
 from urllib.parse import unquote
+import re
 
 app = Flask(__name__)
 CORS(app)
@@ -23,6 +24,28 @@ def get_connection():
     return psycopg2.connect(**DATABASE_CONFIG)
 
 # =============================
+# VALIDATION
+# =============================
+def is_valid_name(name):
+    if not name:
+        return False
+
+    name = name.strip()
+
+    if len(name) < 2 or len(name) > 50:
+        return False
+
+    # Must contain at least one letter or number
+    if not re.search(r'[A-Za-z0-9]', name):
+        return False
+
+    # Allow only letters, numbers, spaces, dash and underscore
+    if not re.fullmatch(r'[A-Za-z0-9 _-]+', name):
+        return False
+
+    return True
+
+# =============================
 # INIT DATABASE
 # =============================
 def init_db():
@@ -32,14 +55,14 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS companies (
             id SERIAL PRIMARY KEY,
-            name TEXT UNIQUE
+            name TEXT UNIQUE NOT NULL
         )
     """)
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS categories (
             id SERIAL PRIMARY KEY,
-            name TEXT UNIQUE
+            name TEXT UNIQUE NOT NULL
         )
     """)
 
@@ -110,19 +133,24 @@ def add_company():
     data = request.json
     name = (data.get("name") or "").strip()
 
-    if not name:
-        return jsonify({"error": "Name required"}), 400
+    if not is_valid_name(name):
+        return jsonify({"error": "Invalid company name"}), 400
 
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO companies (name)
-        VALUES (%s)
-        ON CONFLICT (name) DO NOTHING
-    """, (name,))
-    conn.commit()
-    conn.close()
 
+    try:
+        cursor.execute("""
+            INSERT INTO companies (name)
+            VALUES (%s)
+        """, (name,))
+        conn.commit()
+    except psycopg2.errors.UniqueViolation:
+        conn.rollback()
+        conn.close()
+        return jsonify({"error": "Company already exists"}), 400
+
+    conn.close()
     return jsonify({"message": "Company added"})
 
 
@@ -164,19 +192,24 @@ def add_category():
     data = request.json
     name = (data.get("name") or "").strip()
 
-    if not name:
-        return jsonify({"error": "Name required"}), 400
+    if not is_valid_name(name):
+        return jsonify({"error": "Invalid category name"}), 400
 
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO categories (name)
-        VALUES (%s)
-        ON CONFLICT (name) DO NOTHING
-    """, (name,))
-    conn.commit()
-    conn.close()
 
+    try:
+        cursor.execute("""
+            INSERT INTO categories (name)
+            VALUES (%s)
+        """, (name,))
+        conn.commit()
+    except psycopg2.errors.UniqueViolation:
+        conn.rollback()
+        conn.close()
+        return jsonify({"error": "Category already exists"}), 400
+
+    conn.close()
     return jsonify({"message": "Category added"})
 
 
@@ -203,6 +236,7 @@ def delete_category(name):
 # =============================
 # INCIDENTS
 # =============================
+
 @app.route("/incidents", methods=["GET"])
 def get_incidents():
     company = request.args.get("company")
@@ -285,6 +319,13 @@ def get_incidents():
 @app.route("/incidents", methods=["POST"])
 def create_incident():
     data = request.json
+
+    required_fields = ["shift", "category", "company", "description", "operator"]
+
+    for field in required_fields:
+        if not data.get(field):
+            return jsonify({"error": f"{field} is required"}), 400
+
     incident_id = str(uuid.uuid4())
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -311,7 +352,11 @@ def create_incident():
     conn.commit()
     conn.close()
 
-    return jsonify({"message": "Incident created"})
+    return jsonify({
+        "id": incident_id,
+        "timestamp": timestamp,
+        **data
+    })
 
 
 # FULL EDIT (updates timestamp)
@@ -352,7 +397,7 @@ def update_incident(incident_id):
     return jsonify({"message": "Incident updated"})
 
 
-# STATUS ONLY (NEW ROUTE - DOES NOT CHANGE TIMESTAMP)
+# STATUS ONLY (NO timestamp change)
 @app.route("/incidents/<incident_id>/status", methods=["PATCH"])
 def update_status_only(incident_id):
     data = request.json

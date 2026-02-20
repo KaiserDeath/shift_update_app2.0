@@ -1,129 +1,300 @@
-/* ===== Global Reset ===== */
+/* =========================================
+   PREMIUM THEME VARIABLES
+========================================= */
+
+:root {
+  --bg-gradient: linear-gradient(135deg, #eef2ff, #e0f2fe, #f1f5f9);
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-strong: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.4);
+
+  --text: #0f172a;
+  --muted: #64748b;
+
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+
+  --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.08);
+  --shadow-strong: 0 20px 50px rgba(0, 0, 0, 0.15);
+
+  --status-open: #ef4444;
+  --status-progress: #f59e0b;
+  --status-closed: #22c55e;
+  --status-important: #dc2626;
+}
+
+/* DARK MODE */
+
+body.dark {
+  --bg-gradient: linear-gradient(135deg, #0f172a, #1e293b, #0f172a);
+  --glass-bg: rgba(30, 41, 59, 0.55);
+  --glass-strong: rgba(30, 41, 59, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.08);
+
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+
+  --primary: #3b82f6;
+  --primary-hover: #2563eb;
+
+  --shadow-soft: 0 10px 35px rgba(0, 0, 0, 0.4);
+  --shadow-strong: 0 25px 60px rgba(0, 0, 0, 0.6);
+
+  --status-open: #f87171;
+  --status-progress: #fbbf24;
+  --status-closed: #4ade80;
+  --status-important: #ef4444;
+}
+
+/* =========================================
+   GLOBAL RESET
+========================================= */
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-/* ===== Body ===== */
+/* =========================================
+   ANIMATED BACKGROUND
+========================================= */
+
 body {
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #f4f6f9;
-  color: #1f2933;
+  font-family: "Inter", "Segoe UI", sans-serif;
+  background: var(--bg-gradient);
+  background-size: 300% 300%;
+  animation: gradientMove 15s ease infinite;
+  color: var(--text);
+  min-height: 100vh;
+  transition: color 0.3s ease;
 }
 
-/* ===== Main Container ===== */
+@keyframes gradientMove {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* =========================================
+   MAIN WRAPPER
+========================================= */
+
 div {
   max-width: 1200px;
   margin: auto;
 }
 
-/* ===== Headings ===== */
-h1 {
-  margin-bottom: 20px;
-  font-size: 28px;
-  color: #1f4e79;
-}
+/* =========================================
+   HEADER GLASS EFFECT
+========================================= */
 
 h2 {
-  margin: 25px 0 10px 0;
-  font-size: 20px;
-  color: #334e68;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--primary);
+  margin-bottom: 10px;
 }
 
-/* ===== Forms ===== */
+/* =========================================
+   GLASS PANELS
+========================================= */
+
+form,
+div[style*="marginBottom"],
+table {
+  background: var(--glass-bg);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-radius: 22px;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-soft);
+  transition: 0.3s ease;
+}
+
+form:hover,
+div[style*="marginBottom"]:hover,
+table:hover {
+  box-shadow: var(--shadow-strong);
+}
+
+/* FORM LAYOUT */
+
 form {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 14px;
+  padding: 22px;
+  margin: 20px 0;
 }
+
+/* FILTER BAR */
+
+div[style*="marginBottom"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 18px;
+  margin: 20px 0;
+}
+
+/* =========================================
+   INPUTS
+========================================= */
 
 input,
 select {
-  padding: 8px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-strong);
+  color: var(--text);
   font-size: 14px;
-  border: 1px solid #cbd5e0;
-  border-radius: 4px;
-  min-width: 150px;
+  transition: 0.2s ease;
+}
+
+body.dark input,
+body.dark select {
+  background: rgba(255, 255, 255, 0.05);
 }
 
 input:focus,
 select:focus {
   outline: none;
-  border-color: #1f4e79;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
 }
 
-/* ===== Buttons ===== */
+/* =========================================
+   BUTTONS
+========================================= */
+
 button {
-  padding: 8px 14px;
-  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: 16px;
   border: none;
-  border-radius: 4px;
-  background-color: #1f4e79;
+  background: var(--primary);
   color: white;
+  font-weight: 500;
   cursor: pointer;
-  transition: 0.2s ease;
+  transition: 0.25s ease;
 }
 
 button:hover {
-  background-color: #163a5c;
+  background: var(--primary-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(37, 99, 235, 0.4);
 }
 
-/* ===== Tables ===== */
+/* =========================================
+   TABLE
+========================================= */
+
 table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 30px;
-  background-color: white;
-  border-radius: 6px;
+  margin-top: 25px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
+/* =========================================
+   TABLE HEADER (PREMIUM CONTRAST)
+========================================= */
+
 thead {
-  background-color: #1f4e79;
+  background: linear-gradient(
+    135deg,
+    rgba(37, 99, 235, 0.9),
+    rgba(29, 78, 216, 0.9)
+  );
+  color: white;
+  backdrop-filter: blur(12px);
+}
+
+body.dark thead {
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.8),
+    rgba(30, 64, 175, 0.85)
+  );
   color: white;
 }
 
-th,
-td {
-  padding: 10px;
-  text-align: center;
-  font-size: 14px;
-}
-
 th {
+  padding: 16px 12px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
   font-weight: 600;
 }
 
-tr:nth-child(even) {
-  background-color: #f2f6fa;
+
+body.dark thead {
+  background: rgba(255, 255, 255, 0.05);
 }
 
-tr:hover {
-  background-color: #e6eef6;
+th {
+  padding: 16px 12px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
 }
 
-/* ===== Status Dropdown ===== */
-td select {
-  padding: 4px;
-  font-size: 13px;
+td {
+  padding: 15px 12px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--glass-border);
+  transition: 0.2s ease;
 }
 
-/* ===== Operator Gate Page ===== */
-form input[type="text"] {
-  min-width: 250px;
+tr:hover td {
+  background: rgba(255, 255, 255, 0.08);
 }
 
-/* ===== Important Section Styling ===== */
-h2 + table {
-  border-left: 4px solid #d64545;
+/* =========================================
+   STATUS BADGES (GLOWING PILLS)
+========================================= */
+
+.status-open,
+.status-progress,
+.status-closed,
+.status-important {
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  display: inline-block;
+  font-size: 12px;
 }
 
-/* ===== Responsive ===== */
+.status-open {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--status-open);
+}
+
+.status-progress {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--status-progress);
+}
+
+.status-closed {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--status-closed);
+}
+
+.status-important {
+  background: rgba(220, 38, 38, 0.2);
+  color: var(--status-important);
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.4);
+}
+
+/* =========================================
+   RESPONSIVE
+========================================= */
+
 @media (max-width: 900px) {
-  form {
+  form,
+  div[style*="marginBottom"] {
     flex-direction: column;
   }
 

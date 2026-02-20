@@ -20,6 +20,22 @@ function App() {
 
   const operator = "Operator";
 
+  // 🌗 DARK MODE STATE (persistent)
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem("theme") === "dark";
+  });
+
+  // Apply theme to body
+  useEffect(() => {
+    if (darkMode) {
+      document.body.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    } else {
+      document.body.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    }
+  }, [darkMode]);
+
   useEffect(() => {
     loadData();
   }, [filters]);
@@ -51,7 +67,7 @@ function App() {
     }
   };
 
-  // ✅ ADD INCIDENT (safe + consistent)
+  // ✅ ADD INCIDENT
   const addIncident = async (incident) => {
     await fetch("http://127.0.0.1:5000/incidents", {
       method: "POST",
@@ -59,11 +75,10 @@ function App() {
       body: JSON.stringify(incident)
     });
 
-    // 🔥 Reload to ensure correct formatting
     await loadData();
   };
 
-  // ✅ STATUS UPDATE (optimized, no full reload of companies/categories)
+  // ✅ STATUS UPDATE (timestamp NOT modified)
   const updateStatus = async (id, newStatus) => {
     try {
       await fetch(`http://127.0.0.1:5000/incidents/${id}/status`, {
@@ -72,7 +87,7 @@ function App() {
         body: JSON.stringify({ status: newStatus })
       });
 
-      // Update state locally for instant UI move
+      // Local update only
       setIncidents(prev =>
         prev.map(incident =>
           incident.id === id
@@ -121,7 +136,15 @@ function App() {
 
   return (
     <div style={{ padding: "20px" }}>
-      <h2>Shift Log System</h2>
+
+      {/* 🌗 Theme Toggle */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h2>Shift Log System</h2>
+
+        <button onClick={() => setDarkMode(!darkMode)}>
+          {darkMode ? "☀ Light Mode" : "🌙 Dark Mode"}
+        </button>
+      </div>
 
       <IncidentForm
         onAdd={addIncident}
