@@ -10,7 +10,6 @@ function App() {
   const [categories, setCategories] = useState([]);
   const [editingIncident, setEditingIncident] = useState(null);
 
-  // ✅ NEW — Filter state
   const [filters, setFilters] = useState({
     company: "",
     category: "",
@@ -21,14 +20,28 @@ function App() {
 
   const operator = "Operator";
 
-  // 🔁 Reload whenever filters change
+  // 🌗 DARK MODE STATE (persistent)
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem("theme") === "dark";
+  });
+
+  // Apply theme to body
+  useEffect(() => {
+    if (darkMode) {
+      document.body.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    } else {
+      document.body.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    }
+  }, [darkMode]);
+
   useEffect(() => {
     loadData();
   }, [filters]);
 
   const loadData = async (activeFilters = filters) => {
     try {
-      // Remove empty filters
       const cleanFilters = Object.fromEntries(
         Object.entries(activeFilters).filter(([_, v]) => v)
       );
@@ -41,12 +54,10 @@ function App() {
       const incidentsData = await incidentsRes.json();
       setIncidents(incidentsData);
 
-      // Companies
       const companiesRes = await fetch("http://127.0.0.1:5000/companies");
       const companiesData = await companiesRes.json();
       setCompanies(companiesData);
 
-      // Categories
       const categoriesRes = await fetch("http://127.0.0.1:5000/categories");
       const categoriesData = await categoriesRes.json();
       setCategories(categoriesData);
@@ -56,31 +67,41 @@ function App() {
     }
   };
 
-  // ✅ Add Incident
+  // ✅ ADD INCIDENT
   const addIncident = async (incident) => {
-    const response = await fetch("http://127.0.0.1:5000/incidents", {
+    await fetch("http://127.0.0.1:5000/incidents", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(incident)
     });
 
-    const savedIncident = await response.json();
-    setIncidents(prev => [savedIncident, ...prev]);
+    await loadData();
   };
 
-  // ✅ Update status
+  // ✅ STATUS UPDATE (timestamp NOT modified)
   const updateStatus = async (id, newStatus) => {
-    const incident = incidents.find(i => i.id === id);
+    try {
+      await fetch(`http://127.0.0.1:5000/incidents/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus })
+      });
 
-    const updatedIncident = {
-      ...incident,
-      status: newStatus
-    };
+      // Local update only
+      setIncidents(prev =>
+        prev.map(incident =>
+          incident.id === id
+            ? { ...incident, status: newStatus }
+            : incident
+        )
+      );
 
-    await updateIncident(updatedIncident);
+    } catch (error) {
+      console.error("Error updating status:", error);
+    }
   };
 
-  // ✅ Delete
+  // ✅ DELETE
   const deleteIncident = async (id) => {
     if (!window.confirm("Delete this incident?")) return;
 
@@ -93,7 +114,7 @@ function App() {
     );
   };
 
-  // 🔁 Full update
+  // ✅ FULL EDIT (timestamp updates)
   const updateIncident = async (updatedIncident) => {
     await fetch(`http://127.0.0.1:5000/incidents/${updatedIncident.id}`, {
       method: "PUT",
@@ -101,13 +122,10 @@ function App() {
       body: JSON.stringify(updatedIncident)
     });
 
-    // Reload to get updated timestamp
-    loadData();
-
+    await loadData();
     setEditingIncident(null);
   };
 
-  // 🔥 Keep your separation logic EXACTLY as before
   const importantIncidents = incidents.filter(
     i => i.status === "Important"
   );
@@ -118,7 +136,15 @@ function App() {
 
   return (
     <div style={{ padding: "20px" }}>
-      <h2>Shift Log System</h2>
+
+      {/* 🌗 Theme Toggle */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h2>Shift Log System</h2>
+
+        <button onClick={() => setDarkMode(!darkMode)}>
+          {darkMode ? "☀ Light Mode" : "🌙 Dark Mode"}
+        </button>
+      </div>
 
       <IncidentForm
         onAdd={addIncident}
@@ -131,7 +157,6 @@ function App() {
         operator={operator}
       />
 
-      {/* ✅ FILTER SECTION */}
       <div style={{ marginBottom: "20px", marginTop: "20px" }}>
         <select
           value={filters.company}

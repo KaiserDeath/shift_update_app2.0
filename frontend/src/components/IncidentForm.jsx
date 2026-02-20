@@ -22,6 +22,24 @@ function IncidentForm({
 
   const [formData, setFormData] = useState(initialState);
 
+  // 🔒 Validation helper
+  const isValidName = (name) => {
+    if (!name) return false;
+
+    const trimmed = name.trim();
+
+    if (trimmed.length < 2) return false;
+    if (trimmed.length > 50) return false;
+
+    // Must contain at least one letter or number
+    if (!/[a-zA-Z0-9]/.test(trimmed)) return false;
+
+    // Allow only letters, numbers, spaces, dash and underscore
+    if (!/^[a-zA-Z0-9 _-]+$/.test(trimmed)) return false;
+
+    return true;
+  };
+
   // 🔁 Load data when editing
   useEffect(() => {
     if (editingIncident) {
@@ -38,45 +56,93 @@ function IncidentForm({
     }
   }, [editingIncident]);
 
-  const handleChange = (e) => {
+  const handleChange = async (e) => {
     const { name, value } = e.target;
 
-    // ➕ Add new company
+    // ➕ ADD NEW COMPANY
     if (name === "company" && value === "ADD_NEW_COMPANY") {
-      const newCompany = prompt("Enter new company name:");
-      if (!newCompany) return;
+      const input = prompt("Enter new company name:");
+      if (!input) return;
 
-      fetch("http://127.0.0.1:5000/companies", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newCompany })
-      })
-      .then(() => fetch("http://127.0.0.1:5000/companies"))
-      .then(res => res.json())
-      .then(data => {
-        setCompanies(data);
+      const newCompany = input.trim();
+
+      if (!isValidName(newCompany)) {
+        alert("Invalid company name. Use letters and numbers only (min 2 characters).");
+        return;
+      }
+
+      if (companies.includes(newCompany)) {
+        alert("Company already exists.");
         setFormData(prev => ({ ...prev, company: newCompany }));
-      });
+        return;
+      }
+
+      try {
+        const response = await fetch("http://127.0.0.1:5000/companies", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: newCompany })
+        });
+
+        if (!response.ok) {
+          alert("Error creating company.");
+          return;
+        }
+
+        const updated = await fetch("http://127.0.0.1:5000/companies")
+          .then(res => res.json());
+
+        setCompanies(updated);
+        setFormData(prev => ({ ...prev, company: newCompany }));
+
+      } catch (error) {
+        console.error(error);
+        alert("Server error.");
+      }
 
       return;
     }
 
-    // ➕ Add new category
+    // ➕ ADD NEW CATEGORY
     if (name === "category" && value === "ADD_NEW_CATEGORY") {
-      const newCategory = prompt("Enter new category name:");
-      if (!newCategory) return;
+      const input = prompt("Enter new category name:");
+      if (!input) return;
 
-      fetch("http://127.0.0.1:5000/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newCategory })
-      })
-      .then(() => fetch("http://127.0.0.1:5000/categories"))
-      .then(res => res.json())
-      .then(data => {
-        setCategories(data);
+      const newCategory = input.trim();
+
+      if (!isValidName(newCategory)) {
+        alert("Invalid category name. Use letters and numbers only (min 2 characters).");
+        return;
+      }
+
+      if (categories.includes(newCategory)) {
+        alert("Category already exists.");
         setFormData(prev => ({ ...prev, category: newCategory }));
-      });
+        return;
+      }
+
+      try {
+        const response = await fetch("http://127.0.0.1:5000/categories", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: newCategory })
+        });
+
+        if (!response.ok) {
+          alert("Error creating category.");
+          return;
+        }
+
+        const updated = await fetch("http://127.0.0.1:5000/categories")
+          .then(res => res.json());
+
+        setCategories(updated);
+        setFormData(prev => ({ ...prev, category: newCategory }));
+
+      } catch (error) {
+        console.error(error);
+        alert("Server error.");
+      }
 
       return;
     }
@@ -97,7 +163,6 @@ function IncidentForm({
       id: editingIncident?.id
     };
 
-    // 🚨 NO FETCH HERE ANYMORE
     if (editingIncident) {
       onUpdate(incidentData);
     } else {
