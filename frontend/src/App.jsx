@@ -10,7 +10,6 @@ function App() {
   const [categories, setCategories] = useState([]);
   const [editingIncident, setEditingIncident] = useState(null);
 
-  // ✅ NEW — Filter state
   const [filters, setFilters] = useState({
     company: "",
     category: "",
@@ -21,14 +20,12 @@ function App() {
 
   const operator = "Operator";
 
-  // 🔁 Reload whenever filters change
   useEffect(() => {
     loadData();
   }, [filters]);
 
   const loadData = async (activeFilters = filters) => {
     try {
-      // Remove empty filters
       const cleanFilters = Object.fromEntries(
         Object.entries(activeFilters).filter(([_, v]) => v)
       );
@@ -41,12 +38,10 @@ function App() {
       const incidentsData = await incidentsRes.json();
       setIncidents(incidentsData);
 
-      // Companies
       const companiesRes = await fetch("http://127.0.0.1:5000/companies");
       const companiesData = await companiesRes.json();
       setCompanies(companiesData);
 
-      // Categories
       const categoriesRes = await fetch("http://127.0.0.1:5000/categories");
       const categoriesData = await categoriesRes.json();
       setCategories(categoriesData);
@@ -56,31 +51,42 @@ function App() {
     }
   };
 
-  // ✅ Add Incident
+  // ✅ ADD INCIDENT (safe + consistent)
   const addIncident = async (incident) => {
-    const response = await fetch("http://127.0.0.1:5000/incidents", {
+    await fetch("http://127.0.0.1:5000/incidents", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(incident)
     });
 
-    const savedIncident = await response.json();
-    setIncidents(prev => [savedIncident, ...prev]);
+    // 🔥 Reload to ensure correct formatting
+    await loadData();
   };
 
-  // ✅ Update status
+  // ✅ STATUS UPDATE (optimized, no full reload of companies/categories)
   const updateStatus = async (id, newStatus) => {
-    const incident = incidents.find(i => i.id === id);
+    try {
+      await fetch(`http://127.0.0.1:5000/incidents/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus })
+      });
 
-    const updatedIncident = {
-      ...incident,
-      status: newStatus
-    };
+      // Update state locally for instant UI move
+      setIncidents(prev =>
+        prev.map(incident =>
+          incident.id === id
+            ? { ...incident, status: newStatus }
+            : incident
+        )
+      );
 
-    await updateIncident(updatedIncident);
+    } catch (error) {
+      console.error("Error updating status:", error);
+    }
   };
 
-  // ✅ Delete
+  // ✅ DELETE
   const deleteIncident = async (id) => {
     if (!window.confirm("Delete this incident?")) return;
 
@@ -93,7 +99,7 @@ function App() {
     );
   };
 
-  // 🔁 Full update
+  // ✅ FULL EDIT (timestamp updates)
   const updateIncident = async (updatedIncident) => {
     await fetch(`http://127.0.0.1:5000/incidents/${updatedIncident.id}`, {
       method: "PUT",
@@ -101,13 +107,10 @@ function App() {
       body: JSON.stringify(updatedIncident)
     });
 
-    // Reload to get updated timestamp
-    loadData();
-
+    await loadData();
     setEditingIncident(null);
   };
 
-  // 🔥 Keep your separation logic EXACTLY as before
   const importantIncidents = incidents.filter(
     i => i.status === "Important"
   );
@@ -131,7 +134,6 @@ function App() {
         operator={operator}
       />
 
-      {/* ✅ FILTER SECTION */}
       <div style={{ marginBottom: "20px", marginTop: "20px" }}>
         <select
           value={filters.company}

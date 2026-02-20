@@ -281,6 +281,7 @@ def get_incidents():
     return jsonify(incidents)
 
 
+# CREATE
 @app.route("/incidents", methods=["POST"])
 def create_incident():
     data = request.json
@@ -310,19 +311,10 @@ def create_incident():
     conn.commit()
     conn.close()
 
-    return jsonify({
-        "id": incident_id,
-        "timestamp": timestamp,
-        "shift": data.get("shift"),
-        "category": data.get("category"),
-        "company": data.get("company"),
-        "description": data.get("description"),
-        "action_taken": data.get("action_taken"),
-        "status": data.get("status", "Pending"),
-        "operator": data.get("operator")
-    })
+    return jsonify({"message": "Incident created"})
 
 
+# FULL EDIT (updates timestamp)
 @app.route("/incidents/<incident_id>", methods=["PUT"])
 def update_incident(incident_id):
     data = request.json
@@ -358,6 +350,27 @@ def update_incident(incident_id):
     conn.close()
 
     return jsonify({"message": "Incident updated"})
+
+
+# STATUS ONLY (NEW ROUTE - DOES NOT CHANGE TIMESTAMP)
+@app.route("/incidents/<incident_id>/status", methods=["PATCH"])
+def update_status_only(incident_id):
+    data = request.json
+    new_status = data.get("status")
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE incidents
+        SET status = %s
+        WHERE id = %s
+    """, (new_status, incident_id))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Status updated"})
 
 
 @app.route("/incidents/<incident_id>", methods=["DELETE"])
