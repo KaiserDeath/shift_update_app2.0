@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import psycopg2
+import bcrypt
 from datetime import datetime
 import uuid
 from urllib.parse import unquote
@@ -45,6 +46,34 @@ def is_valid_name(name):
 
     return True
 
+
+# =============================
+# ROLE PROTECTION (HEADER VERSION)
+# =============================
+def require_role(allowed_roles):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            username = request.headers.get("Username")  # now read from headers
+            if not username:
+                return jsonify({"error": "Username required"}), 403
+
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT role FROM users WHERE username = %s", (username,))
+            result = cursor.fetchone()
+            conn.close()
+
+            if not result:
+                return jsonify({"error": "User not found"}), 403
+
+            user_role = result[0]
+            if user_role not in allowed_roles:
+                return jsonify({"error": "Unauthorized"}), 403
+
+            return func(*args, **kwargs)
+        wrapper.__name__ = func.__name__
+        return wrapper
+    return decorator
 # =============================
 # INIT DATABASE
 # =============================
@@ -77,6 +106,18 @@ def init_db():
             action_taken TEXT,
             status TEXT,
             operator TEXT
+        )
+    """)
+
+    # =============================
+    # USERS TABLE (NEW)
+    # =============================
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL CHECK (role IN ('admin','supervisor','operator'))
         )
     """)
 
@@ -115,6 +156,60 @@ def init_db():
 
 init_db()
 
+
+# =============================
+# ADMIN CREATE USER (NEW)
+# =============================
+@app.route("/admin/create-user", methods=["POST"])
+def create_user():
+
+    data = request.json
+
+    admin_username = data.get("admin_username")
+    username = data.get("username")
+    password = data.get("password")
+    role = data.get("role")
+
+    if not all([admin_username, username, password, role]):
+        return jsonify({"error": "All fields required"}), 400
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT role FROM users WHERE username = %s",
+        (admin_username,)
+    )
+
+    admin = cursor.fetchone()
+
+    if not admin or admin[0] != "admin":
+        conn.close()
+        return jsonify({"error": "Only admin can create users"}), 403
+
+    password_hash = bcrypt.hashpw(
+        password.encode(),
+        bcrypt.gensalt()
+    ).decode()
+
+    try:
+        cursor.execute("""
+            INSERT INTO users (username, password_hash, role)
+            VALUES (%s, %s, %s)
+        """, (username, password_hash, role))
+
+        conn.commit()
+
+    except psycopg2.errors.UniqueViolation:
+        conn.rollback()
+        conn.close()
+        return jsonify({"error": "Username already exists"}), 400
+
+    conn.close()
+
+    return jsonify({"message": "User created"})
+
+
 # =============================
 # COMPANIES
 # =============================
@@ -129,7 +224,9 @@ def get_companies():
 
 
 @app.route("/companies", methods=["POST"])
+@require_role(["admin", "supervisor"])
 def add_company():
+
     data = request.json
     name = (data.get("name") or "").strip()
 
@@ -144,18 +241,23 @@ def add_company():
             INSERT INTO companies (name)
             VALUES (%s)
         """, (name,))
+
         conn.commit()
+
     except psycopg2.errors.UniqueViolation:
         conn.rollback()
         conn.close()
         return jsonify({"error": "Company already exists"}), 400
 
     conn.close()
+
     return jsonify({"message": "Company added"})
 
 
 @app.route("/companies/<path:name>", methods=["DELETE"])
+@require_role(["admin", "supervisor"])
 def delete_company(name):
+
     name = unquote(name).strip()
 
     conn = get_connection()
@@ -174,6 +276,7 @@ def delete_company(name):
 
     return jsonify({"message": "Company deleted"})
 
+
 # =============================
 # CATEGORIES
 # =============================
@@ -188,7 +291,9 @@ def get_categories():
 
 
 @app.route("/categories", methods=["POST"])
+@require_role(["admin", "supervisor"])
 def add_category():
+
     data = request.json
     name = (data.get("name") or "").strip()
 
@@ -203,18 +308,23 @@ def add_category():
             INSERT INTO categories (name)
             VALUES (%s)
         """, (name,))
+
         conn.commit()
+
     except psycopg2.errors.UniqueViolation:
         conn.rollback()
         conn.close()
         return jsonify({"error": "Category already exists"}), 400
 
     conn.close()
+
     return jsonify({"message": "Category added"})
 
 
 @app.route("/categories/<path:name>", methods=["DELETE"])
+@require_role(["admin", "supervisor"])
 def delete_category(name):
+
     name = unquote(name).strip()
 
     conn = get_connection()
@@ -233,9 +343,11 @@ def delete_category(name):
 
     return jsonify({"message": "Category deleted"})
 
+
 # =============================
 # INCIDENTS
 # =============================
+# --- YOUR ENTIRE INCIDENT SECTION REMAINS 100% UNCHANGED BELOW ---
 
 @app.route("/incidents", methods=["GET"])
 def get_incidents():
@@ -426,6 +538,36 @@ def delete_incident(incident_id):
     conn.commit()
     conn.close()
     return jsonify({"message": "Incident deleted"})
+
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.json
+    username = data.get("username")
+    password = data.get("password")
+
+    conn = psycopg2.connect(**DATABASE_CONFIG)
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "SELECT id, password_hash, role FROM users WHERE username = %s",
+        (username,)
+    )
+
+    user = cursor.fetchone()
+
+    if not user:
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    user_id, password_hash, role = user
+
+    if not bcrypt.checkpw(password.encode(), password_hash.encode()):
+        return jsonify({"error": "Invalid credentials"}), 401
+
+    return jsonify({
+        "user_id": user_id,
+        "username": username,
+        "role": role
+    })
 
 
 if __name__ == "__main__":

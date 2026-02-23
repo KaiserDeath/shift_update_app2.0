@@ -1,13 +1,28 @@
 import React from "react";
 import IncidentRow from "./IncidentRow";
 
-function IncidentTable({ incidents, onStatusChange, onDelete, onEdit }) {
+function IncidentTable({ 
+  incidents, 
+  onStatusChange, 
+  onDelete, 
+  onEdit,
+  variant 
+}) {
 
   return (
     <div>
-      <h3>All Incidents</h3>
+      <h3>
+        {variant === "pending" && "Pending Incidents"}
+        {variant === "resolved" && "Resolved Incidents"}
+        {!variant && "All Incidents"}
+      </h3>
 
-      <table border="1" cellPadding="5" cellSpacing="0">
+      <table 
+        className={`incident-table ${variant || ""}`}
+        border="1" 
+        cellPadding="5" 
+        cellSpacing="0"
+      >
         <thead>
           <tr>
             <th>Shift</th>

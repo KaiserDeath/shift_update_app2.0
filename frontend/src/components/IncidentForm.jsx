@@ -8,7 +8,8 @@ function IncidentForm({
   setCompanies,
   categories,
   setCategories,
-  operator
+  operator,
+  role // ✅ added role prop
 }) {
 
   const initialState = {
@@ -19,8 +20,6 @@ function IncidentForm({
     action_taken: "",
     status: "Pending"
   };
-
-  const [formData, setFormData] = useState(initialState);
 
   // 🔒 Validation helper
   const isValidName = (name) => {
@@ -39,6 +38,8 @@ function IncidentForm({
 
     return true;
   };
+
+  const [formData, setFormData] = useState(initialState);
 
   // 🔁 Load data when editing
   useEffect(() => {
@@ -80,7 +81,10 @@ function IncidentForm({
       try {
         const response = await fetch("http://127.0.0.1:5000/companies", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Username": operator
+          },
           body: JSON.stringify({ name: newCompany })
         });
 
@@ -124,7 +128,10 @@ function IncidentForm({
       try {
         const response = await fetch("http://127.0.0.1:5000/categories", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Username": operator
+          },
           body: JSON.stringify({ name: newCategory })
         });
 
@@ -206,11 +213,16 @@ function IncidentForm({
             </option>
           ))}
 
-          <option value="ADD_NEW_COMPANY">➕ Add new company</option>
+          {/* only supervisors and admins can see add new company */}
+          {role !== "operator" && (
+            <option value="ADD_NEW_COMPANY">➕ Add new company</option>
+          )}
         </select>
 
+        {/* only supervisors and admins can see delete company button */}
         {formData.company &&
-         formData.company !== "ADD_NEW_COMPANY" && (
+         formData.company !== "ADD_NEW_COMPANY" &&
+         role !== "operator" && (
           <button
             type="button"
             style={{ marginLeft: "10px" }}
@@ -219,7 +231,10 @@ function IncidentForm({
 
               const response = await fetch(
                 `http://127.0.0.1:5000/companies/${encodeURIComponent(formData.company)}`,
-                { method: "DELETE" }
+                {
+                  method: "DELETE",
+                  headers: { "Username": operator }
+                }
               );
 
               if (!response.ok) {
@@ -255,11 +270,16 @@ function IncidentForm({
             </option>
           ))}
 
-          <option value="ADD_NEW_CATEGORY">➕ Add new category</option>
+          {/* only supervisors and admins can see add new category */}
+          {role !== "operator" && (
+            <option value="ADD_NEW_CATEGORY">➕ Add new category</option>
+          )}
         </select>
 
+        {/* only supervisors and admins can see delete category button */}
         {formData.category &&
-         formData.category !== "ADD_NEW_CATEGORY" && (
+         formData.category !== "ADD_NEW_CATEGORY" &&
+         role !== "operator" && (
           <button
             type="button"
             style={{ marginLeft: "10px" }}
@@ -268,7 +288,10 @@ function IncidentForm({
 
               const response = await fetch(
                 `http://127.0.0.1:5000/categories/${encodeURIComponent(formData.category)}`,
-                { method: "DELETE" }
+                {
+                  method: "DELETE",
+                  headers: { "Username": operator }
+                }
               );
 
               if (!response.ok) {

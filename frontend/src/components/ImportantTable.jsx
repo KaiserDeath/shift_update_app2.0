@@ -7,7 +7,12 @@ function ImportantTable({ incidents, onStatusChange, onDelete, onEdit }) {
     <div>
       <h3>Important Incidents</h3>
 
-      <table border="1" cellPadding="5" cellSpacing="0">
+      <table 
+        className="incident-table important"
+        border="1" 
+        cellPadding="5" 
+        cellSpacing="0"
+      >
         <thead>
           <tr>
             <th>Shift</th>

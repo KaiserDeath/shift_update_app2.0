@@ -2,13 +2,15 @@ import React, { useEffect, useState } from "react";
 import IncidentForm from "./components/IncidentForm";
 import IncidentTable from "./components/IncidentTable";
 import ImportantTable from "./components/ImportantTable";
+import Login from "./components/Login";
+import AdminPanel from "./components/AdminPanel"; // ✅ NEW IMPORT
 
 function App() {
-
   const [incidents, setIncidents] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [categories, setCategories] = useState([]);
   const [editingIncident, setEditingIncident] = useState(null);
+  const [user, setUser] = useState(null);
 
   const [filters, setFilters] = useState({
     company: "",
@@ -18,14 +20,9 @@ function App() {
     date_to: ""
   });
 
-  const operator = "Operator";
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("theme") === "dark");
 
-  // 🌗 DARK MODE STATE (persistent)
-  const [darkMode, setDarkMode] = useState(() => {
-    return localStorage.getItem("theme") === "dark";
-  });
-
-  // Apply theme to body
+  // 🌗 DARK MODE EFFECT
   useEffect(() => {
     if (darkMode) {
       document.body.classList.add("dark");
@@ -36,29 +33,46 @@ function App() {
     }
   }, [darkMode]);
 
+  // ✅ DATA LOADING EFFECT
   useEffect(() => {
+    if (!user) return;
     loadData();
-  }, [filters]);
+  }, [filters, user]);
 
   const loadData = async (activeFilters = filters) => {
     try {
       const cleanFilters = Object.fromEntries(
         Object.entries(activeFilters).filter(([_, v]) => v)
       );
-
       const query = new URLSearchParams(cleanFilters).toString();
 
-      const incidentsRes = await fetch(
-        `http://127.0.0.1:5000/incidents?${query}`
-      );
+      // INCIDENTS
+      const incidentsRes = await fetch(`http://127.0.0.1:5000/incidents?${query}`, {
+        headers: {
+          "Role": user.role,
+          "Username": user.username // ✅ Added header
+        }
+      });
       const incidentsData = await incidentsRes.json();
       setIncidents(incidentsData);
 
-      const companiesRes = await fetch("http://127.0.0.1:5000/companies");
+      // COMPANIES
+      const companiesRes = await fetch("http://127.0.0.1:5000/companies", {
+        headers: {
+          "Role": user.role,
+          "Username": user.username // ✅ Added header
+        }
+      });
       const companiesData = await companiesRes.json();
       setCompanies(companiesData);
 
-      const categoriesRes = await fetch("http://127.0.0.1:5000/categories");
+      // CATEGORIES
+      const categoriesRes = await fetch("http://127.0.0.1:5000/categories", {
+        headers: {
+          "Role": user.role,
+          "Username": user.username // ✅ Added header
+        }
+      });
       const categoriesData = await categoriesRes.json();
       setCategories(categoriesData);
 
@@ -67,27 +81,31 @@ function App() {
     }
   };
 
-  // ✅ ADD INCIDENT
   const addIncident = async (incident) => {
     await fetch("http://127.0.0.1:5000/incidents", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Role": user.role,
+        "Username": user.username // ✅ Added header
+      },
       body: JSON.stringify(incident)
     });
-
     await loadData();
   };
 
-  // ✅ STATUS UPDATE (timestamp NOT modified)
   const updateStatus = async (id, newStatus) => {
     try {
       await fetch(`http://127.0.0.1:5000/incidents/${id}/status`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Role": user.role,
+          "Username": user.username // ✅ Added header
+        },
         body: JSON.stringify({ status: newStatus })
       });
 
-      // Local update only
       setIncidents(prev =>
         prev.map(incident =>
           incident.id === id
@@ -101,12 +119,15 @@ function App() {
     }
   };
 
-  // ✅ DELETE
   const deleteIncident = async (id) => {
     if (!window.confirm("Delete this incident?")) return;
 
     await fetch(`http://127.0.0.1:5000/incidents/${id}`, {
-      method: "DELETE"
+      method: "DELETE",
+      headers: {
+        "Role": user.role,
+        "Username": user.username // ✅ Added header
+      }
     });
 
     setIncidents(prev =>
@@ -114,11 +135,14 @@ function App() {
     );
   };
 
-  // ✅ FULL EDIT (timestamp updates)
   const updateIncident = async (updatedIncident) => {
     await fetch(`http://127.0.0.1:5000/incidents/${updatedIncident.id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Role": user.role,
+        "Username": user.username // ✅ Added header
+      },
       body: JSON.stringify(updatedIncident)
     });
 
@@ -126,25 +150,40 @@ function App() {
     setEditingIncident(null);
   };
 
-  const importantIncidents = incidents.filter(
-    i => i.status === "Important"
-  );
+  // ✅ LOGIN BLOCK
+  if (!user) return <Login onLogin={setUser} />;
 
-  const otherIncidents = incidents.filter(
-    i => i.status !== "Important"
-  );
+  // 🔴 Important
+  const importantIncidents = incidents.filter(i => i.status === "Important");
+
+  // 🟡 Pending
+  const pendingIncidents = incidents.filter(i => i.status === "Pending");
+
+  // 🟢 Resolved
+  const resolvedIncidents = incidents.filter(i => i.status === "Resolved");
 
   return (
     <div style={{ padding: "20px" }}>
 
-      {/* 🌗 Theme Toggle */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2>Shift Log System</h2>
 
-        <button onClick={() => setDarkMode(!darkMode)}>
-          {darkMode ? "☀ Light Mode" : "🌙 Dark Mode"}
-        </button>
+        <div>
+          <button onClick={() => setDarkMode(!darkMode)}>
+            {darkMode ? "☀ Light Mode" : "🌙 Dark Mode"}
+          </button>
+
+          <button
+            onClick={() => setUser(null)}
+            style={{ marginLeft: "10px" }}
+          >
+            Logout ({user.username})
+          </button>
+        </div>
       </div>
+
+      {/* ✅ ADMIN PANEL (ONLY FOR ADMINS) */}
+      {user.role === "admin" && <AdminPanel user={user} />}
 
       <IncidentForm
         onAdd={addIncident}
@@ -154,7 +193,8 @@ function App() {
         setCompanies={setCompanies}
         categories={categories}
         setCategories={setCategories}
-        operator={operator}
+        operator={user.username}
+        role={user.role}
       />
 
       <div style={{ marginBottom: "20px", marginTop: "20px" }}>
@@ -220,11 +260,21 @@ function App() {
       />
 
       <IncidentTable
-        incidents={otherIncidents}
+        incidents={pendingIncidents}
+        variant="pending"
         onStatusChange={updateStatus}
         onDelete={deleteIncident}
         onEdit={setEditingIncident}
       />
+
+      <IncidentTable
+        incidents={resolvedIncidents}
+        variant="resolved"
+        onStatusChange={updateStatus}
+        onDelete={deleteIncident}
+        onEdit={setEditingIncident}
+      />
+
     </div>
   );
 }
