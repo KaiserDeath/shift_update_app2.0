@@ -3,14 +3,18 @@ import IncidentForm from "./components/IncidentForm";
 import IncidentTable from "./components/IncidentTable";
 import ImportantTable from "./components/ImportantTable";
 import Login from "./components/Login";
-import AdminPanel from "./components/AdminPanel"; // ✅ NEW IMPORT
+import AdminPanel from "./components/AdminPanel"; // ✅ Admin panel import
 
 function App() {
   const [incidents, setIncidents] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [categories, setCategories] = useState([]);
   const [editingIncident, setEditingIncident] = useState(null);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    // Persistent login: load user from localStorage if exists
+    const storedUser = localStorage.getItem("user");
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
 
   const [filters, setFilters] = useState({
     company: "",
@@ -50,7 +54,7 @@ function App() {
       const incidentsRes = await fetch(`http://127.0.0.1:5000/incidents?${query}`, {
         headers: {
           "Role": user.role,
-          "Username": user.username // ✅ Added header
+          "Username": user.username
         }
       });
       const incidentsData = await incidentsRes.json();
@@ -60,7 +64,7 @@ function App() {
       const companiesRes = await fetch("http://127.0.0.1:5000/companies", {
         headers: {
           "Role": user.role,
-          "Username": user.username // ✅ Added header
+          "Username": user.username
         }
       });
       const companiesData = await companiesRes.json();
@@ -70,7 +74,7 @@ function App() {
       const categoriesRes = await fetch("http://127.0.0.1:5000/categories", {
         headers: {
           "Role": user.role,
-          "Username": user.username // ✅ Added header
+          "Username": user.username
         }
       });
       const categoriesData = await categoriesRes.json();
@@ -87,7 +91,7 @@ function App() {
       headers: {
         "Content-Type": "application/json",
         "Role": user.role,
-        "Username": user.username // ✅ Added header
+        "Username": user.username
       },
       body: JSON.stringify(incident)
     });
@@ -101,7 +105,7 @@ function App() {
         headers: {
           "Content-Type": "application/json",
           "Role": user.role,
-          "Username": user.username // ✅ Added header
+          "Username": user.username
         },
         body: JSON.stringify({ status: newStatus })
       });
@@ -126,7 +130,7 @@ function App() {
       method: "DELETE",
       headers: {
         "Role": user.role,
-        "Username": user.username // ✅ Added header
+        "Username": user.username
       }
     });
 
@@ -141,7 +145,7 @@ function App() {
       headers: {
         "Content-Type": "application/json",
         "Role": user.role,
-        "Username": user.username // ✅ Added header
+        "Username": user.username
       },
       body: JSON.stringify(updatedIncident)
     });
@@ -151,7 +155,10 @@ function App() {
   };
 
   // ✅ LOGIN BLOCK
-  if (!user) return <Login onLogin={setUser} />;
+  if (!user) return <Login onLogin={(data) => {
+    setUser(data);
+    localStorage.setItem("user", JSON.stringify(data)); // save user for persistent login
+  }} />;
 
   // 🔴 Important
   const importantIncidents = incidents.filter(i => i.status === "Important");
@@ -174,7 +181,10 @@ function App() {
           </button>
 
           <button
-            onClick={() => setUser(null)}
+            onClick={() => {
+              setUser(null);                  // clear React state
+              localStorage.removeItem("user"); // clear persistent login
+            }}
             style={{ marginLeft: "10px" }}
           >
             Logout ({user.username})

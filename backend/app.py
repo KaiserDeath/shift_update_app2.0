@@ -30,22 +30,14 @@ def get_connection():
 def is_valid_name(name):
     if not name:
         return False
-
     name = name.strip()
-
     if len(name) < 2 or len(name) > 50:
         return False
-
-    # Must contain at least one letter or number
     if not re.search(r'[A-Za-z0-9]', name):
         return False
-
-    # Allow only letters, numbers, spaces, dash and underscore
     if not re.fullmatch(r'[A-Za-z0-9 _-]+', name):
         return False
-
     return True
-
 
 # =============================
 # ROLE PROTECTION (HEADER VERSION)
@@ -53,27 +45,24 @@ def is_valid_name(name):
 def require_role(allowed_roles):
     def decorator(func):
         def wrapper(*args, **kwargs):
-            username = request.headers.get("Username")  # now read from headers
+            username = request.headers.get("Username")
             if not username:
                 return jsonify({"error": "Username required"}), 403
-
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT role FROM users WHERE username = %s", (username,))
             result = cursor.fetchone()
             conn.close()
-
             if not result:
                 return jsonify({"error": "User not found"}), 403
-
             user_role = result[0]
             if user_role not in allowed_roles:
                 return jsonify({"error": "Unauthorized"}), 403
-
             return func(*args, **kwargs)
         wrapper.__name__ = func.__name__
         return wrapper
     return decorator
+
 # =============================
 # INIT DATABASE
 # =============================
@@ -109,15 +98,21 @@ def init_db():
         )
     """)
 
-    # =============================
-    # USERS TABLE (NEW)
-    # =============================
+    # USERS TABLE
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL CHECK (role IN ('admin','supervisor','operator'))
+        )
+    """)
+    # USER FUNCTIONS TABLE
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_functions (
+            id SERIAL PRIMARY KEY,
+            username TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+            function_name TEXT NOT NULL
         )
     """)
 
@@ -128,7 +123,6 @@ def init_db():
         "Ballerz",
         "Fast Fortunes"
     ]
-
     for company in default_companies:
         cursor.execute("""
             INSERT INTO companies (name)
@@ -143,7 +137,6 @@ def init_db():
         "Glitches",
         "Freeplay"
     ]
-
     for category in default_categories:
         cursor.execute("""
             INSERT INTO categories (name)
@@ -156,15 +149,12 @@ def init_db():
 
 init_db()
 
-
 # =============================
-# ADMIN CREATE USER (NEW)
+# ADMIN CREATE USER
 # =============================
 @app.route("/admin/create-user", methods=["POST"])
 def create_user():
-
     data = request.json
-
     admin_username = data.get("admin_username")
     username = data.get("username")
     password = data.get("password")
@@ -175,40 +165,25 @@ def create_user():
 
     conn = get_connection()
     cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT role FROM users WHERE username = %s",
-        (admin_username,)
-    )
-
+    cursor.execute("SELECT role FROM users WHERE username = %s", (admin_username,))
     admin = cursor.fetchone()
-
     if not admin or admin[0] != "admin":
         conn.close()
         return jsonify({"error": "Only admin can create users"}), 403
 
-    password_hash = bcrypt.hashpw(
-        password.encode(),
-        bcrypt.gensalt()
-    ).decode()
-
+    password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     try:
         cursor.execute("""
             INSERT INTO users (username, password_hash, role)
             VALUES (%s, %s, %s)
         """, (username, password_hash, role))
-
         conn.commit()
-
     except psycopg2.errors.UniqueViolation:
         conn.rollback()
         conn.close()
         return jsonify({"error": "Username already exists"}), 400
-
     conn.close()
-
     return jsonify({"message": "User created"})
-
 
 # =============================
 # COMPANIES
@@ -222,60 +197,40 @@ def get_companies():
     conn.close()
     return jsonify([row[0] for row in rows])
 
-
 @app.route("/companies", methods=["POST"])
 @require_role(["admin", "supervisor"])
 def add_company():
-
     data = request.json
     name = (data.get("name") or "").strip()
-
     if not is_valid_name(name):
         return jsonify({"error": "Invalid company name"}), 400
-
     conn = get_connection()
     cursor = conn.cursor()
-
     try:
-        cursor.execute("""
-            INSERT INTO companies (name)
-            VALUES (%s)
-        """, (name,))
-
+        cursor.execute("INSERT INTO companies (name) VALUES (%s)", (name,))
         conn.commit()
-
     except psycopg2.errors.UniqueViolation:
         conn.rollback()
         conn.close()
         return jsonify({"error": "Company already exists"}), 400
-
     conn.close()
-
     return jsonify({"message": "Company added"})
-
 
 @app.route("/companies/<path:name>", methods=["DELETE"])
 @require_role(["admin", "supervisor"])
 def delete_company(name):
-
     name = unquote(name).strip()
-
     conn = get_connection()
     cursor = conn.cursor()
-
     cursor.execute("SELECT COUNT(*) FROM incidents WHERE company = %s", (name,))
     count = cursor.fetchone()[0]
-
     if count > 0:
         conn.close()
         return jsonify({"error": "IN_USE"}), 400
-
     cursor.execute("DELETE FROM companies WHERE name = %s", (name,))
     conn.commit()
     conn.close()
-
     return jsonify({"message": "Company deleted"})
-
 
 # =============================
 # CATEGORIES
@@ -289,66 +244,44 @@ def get_categories():
     conn.close()
     return jsonify([row[0] for row in rows])
 
-
 @app.route("/categories", methods=["POST"])
 @require_role(["admin", "supervisor"])
 def add_category():
-
     data = request.json
     name = (data.get("name") or "").strip()
-
     if not is_valid_name(name):
         return jsonify({"error": "Invalid category name"}), 400
-
     conn = get_connection()
     cursor = conn.cursor()
-
     try:
-        cursor.execute("""
-            INSERT INTO categories (name)
-            VALUES (%s)
-        """, (name,))
-
+        cursor.execute("INSERT INTO categories (name) VALUES (%s)", (name,))
         conn.commit()
-
     except psycopg2.errors.UniqueViolation:
         conn.rollback()
         conn.close()
         return jsonify({"error": "Category already exists"}), 400
-
     conn.close()
-
     return jsonify({"message": "Category added"})
-
 
 @app.route("/categories/<path:name>", methods=["DELETE"])
 @require_role(["admin", "supervisor"])
 def delete_category(name):
-
     name = unquote(name).strip()
-
     conn = get_connection()
     cursor = conn.cursor()
-
     cursor.execute("SELECT COUNT(*) FROM incidents WHERE category = %s", (name,))
     count = cursor.fetchone()[0]
-
     if count > 0:
         conn.close()
         return jsonify({"error": "IN_USE"}), 400
-
     cursor.execute("DELETE FROM categories WHERE name = %s", (name,))
     conn.commit()
     conn.close()
-
     return jsonify({"message": "Category deleted"})
-
 
 # =============================
 # INCIDENTS
 # =============================
-# --- YOUR ENTIRE INCIDENT SECTION REMAINS 100% UNCHANGED BELOW ---
-
 @app.route("/incidents", methods=["GET"])
 def get_incidents():
     company = request.args.get("company")
@@ -374,38 +307,30 @@ def get_incidents():
     if company:
         query += " AND company = %s"
         params.append(company)
-
     if category:
         query += " AND category = %s"
         params.append(category)
-
     if shift:
         query += " AND shift = %s"
         params.append(shift)
-
     if status:
         query += " AND status = %s"
         params.append(status)
-
     if operator:
         query += " AND operator = %s"
         params.append(operator)
-
     if search:
         query += " AND (description ILIKE %s OR action_taken ILIKE %s)"
         params.append(f"%{search}%")
         params.append(f"%{search}%")
-
     if date_from:
         query += " AND timestamp >= %s"
         params.append(f"{date_from} 00:00:00")
-
     if date_to:
         query += " AND timestamp <= %s"
         params.append(f"{date_to} 23:59:59")
 
     query += " ORDER BY timestamp DESC"
-
     cursor.execute(query, tuple(params))
     rows = cursor.fetchall()
     conn.close()
@@ -423,17 +348,12 @@ def get_incidents():
             "status": row[7],
             "operator": row[8]
         })
-
     return jsonify(incidents)
 
-
-# CREATE
 @app.route("/incidents", methods=["POST"])
 def create_incident():
     data = request.json
-
     required_fields = ["shift", "category", "company", "description", "operator"]
-
     for field in required_fields:
         if not data.get(field):
             return jsonify({"error": f"{field} is required"}), 400
@@ -443,7 +363,6 @@ def create_incident():
 
     conn = get_connection()
     cursor = conn.cursor()
-
     cursor.execute("""
         INSERT INTO incidents
         (id, timestamp, shift, category, company,
@@ -460,18 +379,10 @@ def create_incident():
         data.get("status", "Pending"),
         data.get("operator")
     ))
-
     conn.commit()
     conn.close()
+    return jsonify({"id": incident_id, "timestamp": timestamp, **data})
 
-    return jsonify({
-        "id": incident_id,
-        "timestamp": timestamp,
-        **data
-    })
-
-
-# FULL EDIT (updates timestamp)
 @app.route("/incidents/<incident_id>", methods=["PUT"])
 def update_incident(incident_id):
     data = request.json
@@ -479,7 +390,6 @@ def update_incident(incident_id):
 
     conn = get_connection()
     cursor = conn.cursor()
-
     cursor.execute("""
         UPDATE incidents
         SET timestamp = %s,
@@ -502,33 +412,20 @@ def update_incident(incident_id):
         data.get("operator"),
         incident_id
     ))
-
     conn.commit()
     conn.close()
-
     return jsonify({"message": "Incident updated"})
 
-
-# STATUS ONLY (NO timestamp change)
 @app.route("/incidents/<incident_id>/status", methods=["PATCH"])
 def update_status_only(incident_id):
     data = request.json
     new_status = data.get("status")
-
     conn = get_connection()
     cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE incidents
-        SET status = %s
-        WHERE id = %s
-    """, (new_status, incident_id))
-
+    cursor.execute("UPDATE incidents SET status = %s WHERE id = %s", (new_status, incident_id))
     conn.commit()
     conn.close()
-
     return jsonify({"message": "Status updated"})
-
 
 @app.route("/incidents/<incident_id>", methods=["DELETE"])
 def delete_incident(incident_id):
@@ -539,36 +436,113 @@ def delete_incident(incident_id):
     conn.close()
     return jsonify({"message": "Incident deleted"})
 
+# =============================
+# LOGIN
+# =============================
 @app.route("/login", methods=["POST"])
 def login():
     data = request.json
     username = data.get("username")
     password = data.get("password")
-
-    conn = psycopg2.connect(**DATABASE_CONFIG)
+    conn = get_connection()
     cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT id, password_hash, role FROM users WHERE username = %s",
-        (username,)
-    )
-
+    cursor.execute("SELECT id, password_hash, role FROM users WHERE username = %s", (username,))
     user = cursor.fetchone()
-
     if not user:
         return jsonify({"error": "Invalid credentials"}), 401
-
     user_id, password_hash, role = user
-
     if not bcrypt.checkpw(password.encode(), password_hash.encode()):
         return jsonify({"error": "Invalid credentials"}), 401
+    return jsonify({"user_id": user_id, "username": username, "role": role})
 
-    return jsonify({
-        "user_id": user_id,
-        "username": username,
-        "role": role
-    })
+# =============================
+# ADMIN USERS WITH FUNCTIONS
+# =============================
+@app.route("/admin/users", methods=["GET"])
+@require_role(["admin"])
+def get_users():
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT username, role FROM users ORDER BY username ASC")
+    rows = cursor.fetchall()
+    users = []
+    for row in rows:
+        username, role = row
+        cursor.execute("SELECT function_name FROM user_functions WHERE username = %s", (username,))
+        funcs = [r[0] for r in cursor.fetchall()]
+        users.append({"username": username, "role": role, "functions": funcs})
+    conn.close()
+    return jsonify(users)
 
+@app.route("/admin/users/<username>/functions", methods=["GET"])
+@require_role(["admin"])
+def get_user_functions(username):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT function_name FROM user_functions WHERE username = %s", (username,))
+    rows = cursor.fetchall()
+    conn.close()
+    return jsonify([row[0] for row in rows])
+@app.route("/admin/users/<username>/password", methods=["PATCH"])
+@require_role(["admin"])
+def reset_user_password(username):
+    data = request.json
+    new_password = data.get("password")
+    if not new_password:
+        return jsonify({"error": "Password is required"}), 400
+
+    password_hash = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET password_hash = %s WHERE username = %s", (password_hash, username))
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Password updated successfully"})
+
+
+@app.route("/admin/users/<username>/functions", methods=["PATCH"])
+@require_role(["admin"])
+def update_user_functions(username):
+    data = request.json
+    functions = data.get("functions", [])
+    if not isinstance(functions, list):
+        return jsonify({"error": "Functions must be a list"}), 400
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    
+    # Remove old functions
+    cursor.execute("DELETE FROM user_functions WHERE username = %s", (username,))
+    
+    # Insert new functions
+    for func in functions:
+        cursor.execute(
+            "INSERT INTO user_functions (username, function_name) VALUES (%s, %s)",
+            (username, func)
+        )
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "User functions updated"})
+
+    @app.route("/admin/users/<username>/role", methods=["PATCH"])
+    @require_role(["admin"])
+    def update_user_role(username):
+        data = request.json
+        new_role = data.get("role")
+        if new_role not in ["admin", "supervisor", "operator"]:
+            return jsonify({"error": "Invalid role"}), 400
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET role = %s WHERE username = %s", (new_role, username))
+        conn.commit()
+        conn.close()
+
+        return jsonify({"message": "Role updated successfully"})
 
 if __name__ == "__main__":
     app.run(debug=True)
