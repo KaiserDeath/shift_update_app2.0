@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
+// Dynamically get API URL from env, fallback to localhost
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
+
 const AdminPanel = ({ user }) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("operator");
   const [message, setMessage] = useState("");
   const [users, setUsers] = useState([]);
-  const [showUsers, setShowUsers] = useState(false); // <-- toggle state
+  const [showUsers, setShowUsers] = useState(false);
 
   // Example functions/permissions
   const [functionsList] = useState([
@@ -21,7 +24,7 @@ const AdminPanel = ({ user }) => {
   // Fetch all users from backend
   const fetchUsers = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/admin/users", {
+      const res = await axios.get(`${API_URL}/admin/users`, {
         headers: { Username: user.username }
       });
       setUsers(res.data);
@@ -44,9 +47,9 @@ const AdminPanel = ({ user }) => {
 
     try {
       const res = await axios.post(
-        "http://localhost:5000/admin/create-user",
+        `${API_URL}/admin/create-user`,
         {
-          admin_username: user.username, // required by backend
+          admin_username: user.username,
           username,
           password,
           role
@@ -70,7 +73,7 @@ const AdminPanel = ({ user }) => {
     if (!window.confirm("Delete this user?")) return;
     try {
       await axios.delete(
-        `http://localhost:5000/admin/users/${usernameToDelete}`,
+        `${API_URL}/admin/users/${usernameToDelete}`,
         { headers: { Username: user.username } }
       );
       fetchUsers();
@@ -86,7 +89,7 @@ const AdminPanel = ({ user }) => {
 
     try {
       await axios.patch(
-        `http://localhost:5000/admin/users/${usernameToReset}/password`,
+        `${API_URL}/admin/users/${usernameToReset}/password`,
         { password: newPass },
         { headers: { Username: user.username } }
       );
@@ -107,7 +110,7 @@ const AdminPanel = ({ user }) => {
 
     try {
       await axios.patch(
-        `http://localhost:5000/admin/users/${usernameToUpdate}/functions`,
+        `${API_URL}/admin/users/${usernameToUpdate}/functions`,
         { functions: updatedFuncs },
         { headers: { Username: user.username } }
       );
@@ -121,7 +124,7 @@ const AdminPanel = ({ user }) => {
   const updateRole = async (usernameToUpdate, newRole) => {
     try {
       await axios.patch(
-        `http://localhost:5000/admin/users/${usernameToUpdate}/role`,
+        `${API_URL}/admin/users/${usernameToUpdate}/role`,
         { role: newRole },
         { headers: { Username: user.username } }
       );
