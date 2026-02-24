@@ -6,6 +6,7 @@ from datetime import datetime
 import uuid
 from urllib.parse import unquote
 import re
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -13,16 +14,8 @@ CORS(app)
 # =============================
 # DATABASE CONFIG
 # =============================
-DATABASE_CONFIG = {
-    "dbname": "incidents_db",
-    "user": "postgres",
-    "password": "Back12345",
-    "host": "localhost",
-    "port": "5432"
-}
-
 def get_connection():
-    return psycopg2.connect(**DATABASE_CONFIG)
+    return psycopg2.connect(os.environ["DATABASE_URL"])
 
 # =============================
 # VALIDATION
@@ -545,4 +538,5 @@ def update_user_functions(username):
         return jsonify({"message": "Role updated successfully"})
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
