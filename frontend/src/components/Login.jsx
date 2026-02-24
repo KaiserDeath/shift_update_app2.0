@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from "react";
 
+// Dynamically get API URL from env, fallback to localhost
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
+
 function Login({ onLogin }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -19,7 +22,7 @@ function Login({ onLogin }) {
     }
 
     try {
-      const response = await fetch("http://localhost:5000/login", {
+      const response = await fetch(`${API_URL}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
@@ -41,13 +44,14 @@ function Login({ onLogin }) {
   };
 
   return (
-    <div>
+    <div style={{ padding: "20px", maxWidth: "400px", margin: "auto" }}>
       <h2>Login</h2>
 
       <input
         placeholder="Username"
         value={username}
         onChange={(e) => setUsername(e.target.value)}
+        style={{ display: "block", width: "100%", padding: "8px", marginBottom: "10px" }}
       />
 
       <input
@@ -55,9 +59,15 @@ function Login({ onLogin }) {
         placeholder="Password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
+        style={{ display: "block", width: "100%", padding: "8px", marginBottom: "10px" }}
       />
 
-      <button onClick={handleLogin}>Login</button>
+      <button
+        onClick={handleLogin}
+        style={{ padding: "10px 20px", backgroundColor: "#4CAF50", color: "white", border: "none", borderRadius: "4px", cursor: "pointer" }}
+      >
+        Login
+      </button>
     </div>
   );
 }
