@@ -1,5 +1,22 @@
 const API_URL = "https://shiftupdateapp20-production.up.railway.app";
 
+// ADD THIS FUNCTION (does not affect existing ones)
+export async function login(username, password) {
+  const res = await fetch(`${API_URL}/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      username,
+      password,
+    }),
+  });
+
+  return res.json();
+}
+
+// EXISTING FUNCTIONS — UNCHANGED
 export async function getIncidents() {
   const res = await fetch(`${API_URL}/incidents`);
   return res.json();
