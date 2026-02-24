@@ -5,13 +5,15 @@ import ImportantTable from "./components/ImportantTable";
 import Login from "./components/Login";
 import AdminPanel from "./components/AdminPanel"; // ✅ Admin panel import
 
+// dynamically get API URL from env, fallback to localhost
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
+
 function App() {
   const [incidents, setIncidents] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [categories, setCategories] = useState([]);
   const [editingIncident, setEditingIncident] = useState(null);
   const [user, setUser] = useState(() => {
-    // Persistent login: load user from localStorage if exists
     const storedUser = localStorage.getItem("user");
     return storedUser ? JSON.parse(storedUser) : null;
   });
@@ -21,10 +23,12 @@ function App() {
     category: "",
     search: "",
     date_from: "",
-    date_to: ""
+    date_to: "",
   });
 
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("theme") === "dark");
+  const [darkMode, setDarkMode] = useState(
+    () => localStorage.getItem("theme") === "dark"
+  );
 
   // 🌗 DARK MODE EFFECT
   useEffect(() => {
@@ -51,73 +55,69 @@ function App() {
       const query = new URLSearchParams(cleanFilters).toString();
 
       // INCIDENTS
-      const incidentsRes = await fetch(`http://127.0.0.1:5000/incidents?${query}`, {
+      const incidentsRes = await fetch(`${API_URL}/incidents?${query}`, {
         headers: {
-          "Role": user.role,
-          "Username": user.username
-        }
+          Role: user.role,
+          Username: user.username,
+        },
       });
       const incidentsData = await incidentsRes.json();
       setIncidents(incidentsData);
 
       // COMPANIES
-      const companiesRes = await fetch("http://127.0.0.1:5000/companies", {
+      const companiesRes = await fetch(`${API_URL}/companies`, {
         headers: {
-          "Role": user.role,
-          "Username": user.username
-        }
+          Role: user.role,
+          Username: user.username,
+        },
       });
       const companiesData = await companiesRes.json();
       setCompanies(companiesData);
 
       // CATEGORIES
-      const categoriesRes = await fetch("http://127.0.0.1:5000/categories", {
+      const categoriesRes = await fetch(`${API_URL}/categories`, {
         headers: {
-          "Role": user.role,
-          "Username": user.username
-        }
+          Role: user.role,
+          Username: user.username,
+        },
       });
       const categoriesData = await categoriesRes.json();
       setCategories(categoriesData);
-
     } catch (error) {
       console.error("Error loading data:", error);
     }
   };
 
   const addIncident = async (incident) => {
-    await fetch("http://127.0.0.1:5000/incidents", {
+    await fetch(`${API_URL}/incidents`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Role": user.role,
-        "Username": user.username
+        Role: user.role,
+        Username: user.username,
       },
-      body: JSON.stringify(incident)
+      body: JSON.stringify(incident),
     });
     await loadData();
   };
 
   const updateStatus = async (id, newStatus) => {
     try {
-      await fetch(`http://127.0.0.1:5000/incidents/${id}/status`, {
+      await fetch(`${API_URL}/incidents/${id}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "Role": user.role,
-          "Username": user.username
+          Role: user.role,
+          Username: user.username,
         },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ status: newStatus }),
       });
 
-      setIncidents(prev =>
-        prev.map(incident =>
-          incident.id === id
-            ? { ...incident, status: newStatus }
-            : incident
+      setIncidents((prev) =>
+        prev.map((incident) =>
+          incident.id === id ? { ...incident, status: newStatus } : incident
         )
       );
-
     } catch (error) {
       console.error("Error updating status:", error);
     }
@@ -126,28 +126,26 @@ function App() {
   const deleteIncident = async (id) => {
     if (!window.confirm("Delete this incident?")) return;
 
-    await fetch(`http://127.0.0.1:5000/incidents/${id}`, {
+    await fetch(`${API_URL}/incidents/${id}`, {
       method: "DELETE",
       headers: {
-        "Role": user.role,
-        "Username": user.username
-      }
+        Role: user.role,
+        Username: user.username,
+      },
     });
 
-    setIncidents(prev =>
-      prev.filter(incident => incident.id !== id)
-    );
+    setIncidents((prev) => prev.filter((incident) => incident.id !== id));
   };
 
   const updateIncident = async (updatedIncident) => {
-    await fetch(`http://127.0.0.1:5000/incidents/${updatedIncident.id}`, {
+    await fetch(`${API_URL}/incidents/${updatedIncident.id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        "Role": user.role,
-        "Username": user.username
+        Role: user.role,
+        Username: user.username,
       },
-      body: JSON.stringify(updatedIncident)
+      body: JSON.stringify(updatedIncident),
     });
 
     await loadData();
@@ -155,24 +153,34 @@ function App() {
   };
 
   // ✅ LOGIN BLOCK
-  if (!user) return <Login onLogin={(data) => {
-    setUser(data);
-    localStorage.setItem("user", JSON.stringify(data)); // save user for persistent login
-  }} />;
+  if (!user)
+    return (
+      <Login
+        onLogin={(data) => {
+          setUser(data);
+          localStorage.setItem("user", JSON.stringify(data));
+        }}
+      />
+    );
 
   // 🔴 Important
-  const importantIncidents = incidents.filter(i => i.status === "Important");
+  const importantIncidents = incidents.filter((i) => i.status === "Important");
 
   // 🟡 Pending
-  const pendingIncidents = incidents.filter(i => i.status === "Pending");
+  const pendingIncidents = incidents.filter((i) => i.status === "Pending");
 
   // 🟢 Resolved
-  const resolvedIncidents = incidents.filter(i => i.status === "Resolved");
+  const resolvedIncidents = incidents.filter((i) => i.status === "Resolved");
 
   return (
     <div style={{ padding: "20px" }}>
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <h2>Shift Log System</h2>
 
         <div>
@@ -182,8 +190,8 @@ function App() {
 
           <button
             onClick={() => {
-              setUser(null);                  // clear React state
-              localStorage.removeItem("user"); // clear persistent login
+              setUser(null);
+              localStorage.removeItem("user");
             }}
             style={{ marginLeft: "10px" }}
           >
@@ -216,7 +224,9 @@ function App() {
         >
           <option value="">All Companies</option>
           {companies.map((c) => (
-            <option key={c} value={c}>{c}</option>
+            <option key={c} value={c}>
+              {c}
+            </option>
           ))}
         </select>
 
@@ -229,7 +239,9 @@ function App() {
         >
           <option value="">All Categories</option>
           {categories.map((c) => (
-            <option key={c} value={c}>{c}</option>
+            <option key={c} value={c}>
+              {c}
+            </option>
           ))}
         </select>
 
@@ -284,7 +296,6 @@ function App() {
         onDelete={deleteIncident}
         onEdit={setEditingIncident}
       />
-
     </div>
   );
 }
