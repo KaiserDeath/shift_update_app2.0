@@ -1,4 +1,4 @@
-const API_URL = "http://127.0.0.1:5000";
+const API_URL = "https://shiftupdateapp20-production.up.railway.app";
 
 export async function getIncidents() {
   const res = await fetch(`${API_URL}/incidents`);
