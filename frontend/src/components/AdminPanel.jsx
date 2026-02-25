@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
-// Dynamically get API URL from env, fallback to localhost
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
 
 const AdminPanel = ({ user }) => {
@@ -12,16 +11,7 @@ const AdminPanel = ({ user }) => {
   const [users, setUsers] = useState([]);
   const [showUsers, setShowUsers] = useState(false);
 
-  // Example functions/permissions
-  const [functionsList] = useState([
-    "add_incident",
-    "delete_incident",
-    "edit_incident",
-    "manage_users",
-    "manage_companies"
-  ]);
-
-  // Fetch all users from backend
+  // Fetch all users
   const fetchUsers = async () => {
     try {
       const res = await axios.get(`${API_URL}/admin/users`, {
@@ -33,63 +23,49 @@ const AdminPanel = ({ user }) => {
     }
   };
 
-  // Load users on component mount if admin
   useEffect(() => {
     if (user?.role === "admin") fetchUsers();
   }, [user]);
 
-  // Create a new user
+  // Create user
   const handleCreateUser = async () => {
     if (!username || !password || !role) {
       setMessage("All fields are required");
       return;
     }
-
     try {
       const res = await axios.post(
         `${API_URL}/admin/create-user`,
-        {
-          admin_username: user.username,
-          username,
-          password,
-          role
-        },
+        { admin_username: user.username, username, password, role },
         { headers: { "Content-Type": "application/json" } }
       );
-
       setMessage(res.data.message);
-      setUsername("");
-      setPassword("");
-      setRole("operator");
-
-      fetchUsers(); // refresh table
+      setUsername(""); setPassword(""); setRole("operator");
+      fetchUsers();
     } catch (err) {
       setMessage(err.response?.data?.error || "Server error");
     }
   };
 
-  // Delete a user
+  // Delete user
   const deleteUser = async (usernameToDelete) => {
-    if (!window.confirm("Delete this user?")) return;
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
     try {
-      await axios.delete(
-        `${API_URL}/admin/users/${usernameToDelete}`,
-        { headers: { Username: user.username } }
-      );
+      await axios.delete(`${API_URL}/admin/users/${usernameToDelete}`, {
+        headers: { Username: user.username }
+      });
       fetchUsers();
     } catch (err) {
       console.error("Error deleting user:", err);
     }
   };
 
-  // Reset user password
+  // Reset password
   const resetPassword = async (usernameToReset) => {
     const newPass = prompt("Enter new password:");
     if (!newPass) return;
-
     try {
-      await axios.patch(
-        `${API_URL}/admin/users/${usernameToReset}/password`,
+      await axios.patch(`${API_URL}/admin/users/${usernameToReset}/password`, 
         { password: newPass },
         { headers: { Username: user.username } }
       );
@@ -99,32 +75,10 @@ const AdminPanel = ({ user }) => {
     }
   };
 
-  // Update user functions/permissions
-  const updateFunctions = async (usernameToUpdate, func, checked) => {
-    const userObj = users.find(u => u.username === usernameToUpdate);
-    if (!userObj) return;
-
-    const updatedFuncs = checked
-      ? [...(userObj.functions || []), func]
-      : (userObj.functions || []).filter(f => f !== func);
-
-    try {
-      await axios.patch(
-        `${API_URL}/admin/users/${usernameToUpdate}/functions`,
-        { functions: updatedFuncs },
-        { headers: { Username: user.username } }
-      );
-      fetchUsers();
-    } catch (err) {
-      console.error("Error updating functions:", err);
-    }
-  };
-
-  // Update user role
+  // Update role
   const updateRole = async (usernameToUpdate, newRole) => {
     try {
-      await axios.patch(
-        `${API_URL}/admin/users/${usernameToUpdate}/role`,
+      await axios.patch(`${API_URL}/admin/users/${usernameToUpdate}/role`,
         { role: newRole },
         { headers: { Username: user.username } }
       );
@@ -135,32 +89,22 @@ const AdminPanel = ({ user }) => {
   };
 
   return (
-    <div style={{
-      marginTop: "40px",
-      padding: "20px",
-      border: "1px solid #ccc",
-      borderRadius: "8px"
-    }}>
+    <div style={{ marginTop: "40px", padding: "20px", border: "1px solid #ccc", borderRadius: "8px" }}>
       <h2>Admin Panel - Create User</h2>
 
       {/* Create User Form */}
       <input
-        type="text"
-        placeholder="Username"
-        value={username}
+        type="text" placeholder="Username" value={username}
         onChange={e => setUsername(e.target.value)}
         style={{ display: "block", marginBottom: "10px", width: "100%", padding: "8px" }}
       />
       <input
-        type="password"
-        placeholder="Password"
-        value={password}
+        type="password" placeholder="Password" value={password}
         onChange={e => setPassword(e.target.value)}
         style={{ display: "block", marginBottom: "10px", width: "100%", padding: "8px" }}
       />
       <select
-        value={role}
-        onChange={e => setRole(e.target.value)}
+        value={role} onChange={e => setRole(e.target.value)}
         style={{ display: "block", marginBottom: "10px", width: "100%", padding: "8px" }}
       >
         <option value="operator">Operator</option>
@@ -174,11 +118,7 @@ const AdminPanel = ({ user }) => {
         Create User
       </button>
 
-      {message && (
-        <p style={{ marginTop: "10px", color: message.toLowerCase().includes("error") ? "red" : "green" }}>
-          {message}
-        </p>
-      )}
+      {message && <p style={{ marginTop: "10px", color: message.toLowerCase().includes("error") ? "red" : "green" }}>{message}</p>}
 
       {/* Toggle Users Table */}
       <div style={{ marginTop: "30px" }}>
@@ -197,7 +137,6 @@ const AdminPanel = ({ user }) => {
                 <tr>
                   <th>Username</th>
                   <th>Role</th>
-                  <th>Functions</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -206,30 +145,15 @@ const AdminPanel = ({ user }) => {
                   <tr key={u.username} style={{ borderBottom: "1px solid #ccc" }}>
                     <td>{u.username}</td>
                     <td>
-                      <select
-                        value={u.role}
-                        onChange={e => updateRole(u.username, e.target.value)}
-                      >
+                      <select value={u.role} onChange={e => updateRole(u.username, e.target.value)}>
                         <option value="operator">Operator</option>
                         <option value="supervisor">Supervisor</option>
                         <option value="admin">Admin</option>
                       </select>
                     </td>
                     <td>
-                      {functionsList.map(f => (
-                        <label key={f} style={{ display: "block" }}>
-                          <input
-                            type="checkbox"
-                            checked={u.functions?.includes(f)}
-                            onChange={e => updateFunctions(u.username, f, e.target.checked)}
-                          />
-                          {f}
-                        </label>
-                      ))}
-                    </td>
-                    <td>
                       <button onClick={() => resetPassword(u.username)}>Reset Password</button>
-                      <button onClick={() => deleteUser(u.username)} style={{ marginLeft: "5px" }}>Delete</button>
+                      <button onClick={() => deleteUser(u.username)} style={{ marginLeft: "5px", backgroundColor: "#f44336", color: "white" }}>Delete</button>
                     </td>
                   </tr>
                 ))}

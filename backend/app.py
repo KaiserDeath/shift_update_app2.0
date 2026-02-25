@@ -9,7 +9,10 @@ import re
 import os
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=[
+    "https://shiftupdateapp20-production.up.railway.app",
+    "http://localhost:5173"  # if developing locally
+])
 
 # =============================
 # DATABASE CONFIG
@@ -98,14 +101,6 @@ def init_db():
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL CHECK (role IN ('admin','supervisor','operator'))
-        )
-    """)
-    # USER FUNCTIONS TABLE
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS user_functions (
-            id SERIAL PRIMARY KEY,
-            username TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE,
-            function_name TEXT NOT NULL
         )
     """)
 
@@ -449,7 +444,7 @@ def login():
     return jsonify({"user_id": user_id, "username": username, "role": role})
 
 # =============================
-# ADMIN USERS WITH FUNCTIONS
+# ADMIN USERS
 # =============================
 @app.route("/admin/users", methods=["GET"])
 @require_role(["admin"])
@@ -458,24 +453,10 @@ def get_users():
     cursor = conn.cursor()
     cursor.execute("SELECT username, role FROM users ORDER BY username ASC")
     rows = cursor.fetchall()
-    users = []
-    for row in rows:
-        username, role = row
-        cursor.execute("SELECT function_name FROM user_functions WHERE username = %s", (username,))
-        funcs = [r[0] for r in cursor.fetchall()]
-        users.append({"username": username, "role": role, "functions": funcs})
+    users = [{"username": row[0], "role": row[1]} for row in rows]
     conn.close()
     return jsonify(users)
 
-@app.route("/admin/users/<username>/functions", methods=["GET"])
-@require_role(["admin"])
-def get_user_functions(username):
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT function_name FROM user_functions WHERE username = %s", (username,))
-    rows = cursor.fetchall()
-    conn.close()
-    return jsonify([row[0] for row in rows])
 @app.route("/admin/users/<username>/password", methods=["PATCH"])
 @require_role(["admin"])
 def reset_user_password(username):
@@ -494,49 +475,35 @@ def reset_user_password(username):
 
     return jsonify({"message": "Password updated successfully"})
 
-
-@app.route("/admin/users/<username>/functions", methods=["PATCH"])
+@app.route("/admin/users/<username>/role", methods=["PATCH"])
 @require_role(["admin"])
-def update_user_functions(username):
+def update_user_role(username):
     data = request.json
-    functions = data.get("functions", [])
-    if not isinstance(functions, list):
-        return jsonify({"error": "Functions must be a list"}), 400
+    new_role = data.get("role")
+    if new_role not in ["admin", "supervisor", "operator"]:
+        return jsonify({"error": "Invalid role"}), 400
 
     conn = get_connection()
     cursor = conn.cursor()
-    
-    # Remove old functions
-    cursor.execute("DELETE FROM user_functions WHERE username = %s", (username,))
-    
-    # Insert new functions
-    for func in functions:
-        cursor.execute(
-            "INSERT INTO user_functions (username, function_name) VALUES (%s, %s)",
-            (username, func)
-        )
-
+    cursor.execute("UPDATE users SET role = %s WHERE username = %s", (new_role, username))
     conn.commit()
     conn.close()
 
-    return jsonify({"message": "User functions updated"})
+    return jsonify({"message": "Role updated successfully"})
 
-    @app.route("/admin/users/<username>/role", methods=["PATCH"])
-    @require_role(["admin"])
-    def update_user_role(username):
-        data = request.json
-        new_role = data.get("role")
-        if new_role not in ["admin", "supervisor", "operator"]:
-            return jsonify({"error": "Invalid role"}), 400
+@app.route("/admin/users/<username>", methods=["DELETE"])
+@require_role(["admin"])
+def delete_user(username):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM users WHERE username = %s", (username,))
+    conn.commit()
+    conn.close()
+    return jsonify({"message": "User deleted"})
 
-        conn = get_connection()
-        cursor = conn.cursor()
-        cursor.execute("UPDATE users SET role = %s WHERE username = %s", (new_role, username))
-        conn.commit()
-        conn.close()
-
-        return jsonify({"message": "Role updated successfully"})
-
+# =============================
+# HOME
+# =============================
 @app.route("/")
 def home():
     return jsonify({"message": "Backend is running"})
