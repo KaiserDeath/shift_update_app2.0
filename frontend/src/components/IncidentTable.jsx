@@ -1,5 +1,6 @@
 import React from "react";
 import IncidentRow from "./IncidentRow";
+import { formatTimestamp } from "../utils/time";
 
 function IncidentTable({ 
   incidents, 

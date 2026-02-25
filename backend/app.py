@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import psycopg2
 import bcrypt
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from urllib.parse import unquote
 import re

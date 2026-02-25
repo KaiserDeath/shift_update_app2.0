@@ -1,4 +1,5 @@
 import React from "react";
+import { formatTimestamp } from "../utils/time";
 
 function IncidentRow({ incident, onStatusChange, onDelete, onEdit }) {
 
@@ -9,7 +10,7 @@ function IncidentRow({ incident, onStatusChange, onDelete, onEdit }) {
   return (
     <tr>
       <td>{incident.shift}</td>
-      <td>{incident.timestamp}</td>
+      <td>{formatTimestamp(incident.timestamp)}</td>
       <td>{incident.operator}</td>
       <td>{incident.company}</td>
       <td>{incident.category}</td>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { formatTimestamp } from "../utils/time";
 
 function IncidentForm({
   onAdd,
