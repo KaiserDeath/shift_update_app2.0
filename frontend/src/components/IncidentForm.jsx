@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { formatTimestamp } from "../utils/time";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
+
 function IncidentForm({
   onAdd,
   onUpdate,
@@ -80,7 +82,7 @@ function IncidentForm({
       }
 
       try {
-        const response = await fetch("http://127.0.0.1:5000/companies", {
+        const response = await fetch(`${API_URL}/companies`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -94,7 +96,7 @@ function IncidentForm({
           return;
         }
 
-        const updated = await fetch("http://127.0.0.1:5000/companies")
+        const updated = await fetch(`${API_URL}/companies`)
           .then(res => res.json());
 
         setCompanies(updated);
@@ -127,7 +129,7 @@ function IncidentForm({
       }
 
       try {
-        const response = await fetch("http://127.0.0.1:5000/categories", {
+        const response = await fetch(`${API_URL}/categories`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -141,7 +143,7 @@ function IncidentForm({
           return;
         }
 
-        const updated = await fetch("http://127.0.0.1:5000/categories")
+        const updated = await fetch(`${API_URL}/categories`)
           .then(res => res.json());
 
         setCategories(updated);
@@ -214,13 +216,11 @@ function IncidentForm({
             </option>
           ))}
 
-          {/* only supervisors and admins can see add new company */}
           {role !== "operator" && (
             <option value="ADD_NEW_COMPANY">➕ Add new company</option>
           )}
         </select>
 
-        {/* only supervisors and admins can see delete company button */}
         {formData.company &&
          formData.company !== "ADD_NEW_COMPANY" &&
          role !== "operator" && (
@@ -231,7 +231,7 @@ function IncidentForm({
               if (!window.confirm("Delete this company?")) return;
 
               const response = await fetch(
-                `http://127.0.0.1:5000/companies/${encodeURIComponent(formData.company)}`,
+                `${API_URL}/companies/${encodeURIComponent(formData.company)}`,
                 {
                   method: "DELETE",
                   headers: { "Username": operator }
@@ -243,7 +243,7 @@ function IncidentForm({
                 return;
               }
 
-              const updated = await fetch("http://127.0.0.1:5000/companies")
+              const updated = await fetch(`${API_URL}/companies`)
                 .then(res => res.json());
 
               setCompanies(updated);
@@ -271,13 +271,11 @@ function IncidentForm({
             </option>
           ))}
 
-          {/* only supervisors and admins can see add new category */}
           {role !== "operator" && (
             <option value="ADD_NEW_CATEGORY">➕ Add new category</option>
           )}
         </select>
 
-        {/* only supervisors and admins can see delete category button */}
         {formData.category &&
          formData.category !== "ADD_NEW_CATEGORY" &&
          role !== "operator" && (
@@ -288,7 +286,7 @@ function IncidentForm({
               if (!window.confirm("Delete this category?")) return;
 
               const response = await fetch(
-                `http://127.0.0.1:5000/categories/${encodeURIComponent(formData.category)}`,
+                `${API_URL}/categories/${encodeURIComponent(formData.category)}`,
                 {
                   method: "DELETE",
                   headers: { "Username": operator }
@@ -300,7 +298,7 @@ function IncidentForm({
                 return;
               }
 
-              const updated = await fetch("http://127.0.0.1:5000/categories")
+              const updated = await fetch(`${API_URL}/categories`)
                 .then(res => res.json());
 
               setCategories(updated);

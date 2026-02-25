@@ -9,10 +9,16 @@ import re
 import os
 
 app = Flask(__name__)
-CORS(app, origins=[
-    "https://shiftupdateapp20-production.up.railway.app",
-    "http://localhost:5173"  # if developing locally
-])
+CORS(
+    app,
+    origins=[
+        "https://shiftupdateapp20-production.up.railway.app",
+        "https://shift-update-app2-0.vercel.app",  # ✅ ADD THIS
+        "http://localhost:5173"
+    ],
+    allow_headers=["Content-Type", "Username"],
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+)
 
 # =============================
 # DATABASE CONFIG
@@ -41,20 +47,37 @@ def is_valid_name(name):
 def require_role(allowed_roles):
     def decorator(func):
         def wrapper(*args, **kwargs):
+
+            # ✅ Allow CORS preflight without authentication
+            if request.method == "OPTIONS":
+                return "", 200
+
             username = request.headers.get("Username")
+
             if not username:
                 return jsonify({"error": "Username required"}), 403
+
             conn = get_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT role FROM users WHERE username = %s", (username,))
+
+            cursor.execute(
+                "SELECT role FROM users WHERE username = %s",
+                (username,)
+            )
+
             result = cursor.fetchone()
             conn.close()
+
             if not result:
                 return jsonify({"error": "User not found"}), 403
+
             user_role = result[0]
+
             if user_role not in allowed_roles:
                 return jsonify({"error": "Unauthorized"}), 403
+
             return func(*args, **kwargs)
+
         wrapper.__name__ = func.__name__
         return wrapper
     return decorator
