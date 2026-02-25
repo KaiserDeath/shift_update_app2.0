@@ -16,7 +16,7 @@ CORS(
         "https://shift-update-app2-0.vercel.app",  # ✅ ADD THIS
         "http://localhost:5173"
     ],
-    allow_headers=["Content-Type", "Username"],
+    allow_headers=["Content-Type", "Username", "Role"],
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 )
 
