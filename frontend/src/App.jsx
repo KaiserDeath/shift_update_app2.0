@@ -89,16 +89,35 @@ function App() {
   };
 
   const addIncident = async (incident) => {
-    await fetch(`${API_URL}/incidents`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Role: user.role,
-        Username: user.username,
-      },
-      body: JSON.stringify(incident),
-    });
-    await loadData();
+    try {
+      const response = await fetch(`${API_URL}/incidents`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Role: user.role,
+          Username: user.username,
+        },
+        body: JSON.stringify(incident),
+      });
+
+      if (!response.ok) {
+        alert("Error creating incident");
+        return;
+      }
+
+      // ✅ get created incident from backend
+      const createdIncident = await response.json();
+
+      // ✅ instant UI update
+      setIncidents(prev => [createdIncident, ...prev]);
+
+      // ✅ optional background sync (recommended)
+      loadData();
+
+    } catch (error) {
+      console.error(error);
+      alert("Server error");
+    }
   };
 
   const updateStatus = async (id, newStatus) => {
