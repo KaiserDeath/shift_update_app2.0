@@ -1,7 +1,6 @@
 /* =========================================
    PREMIUM THEME VARIABLES
 ========================================= */
-
 :root {
   --bg-gradient: linear-gradient(135deg, #eef2ff, #e0f2fe, #f1f5f9);
   --glass-bg: rgba(255, 255, 255, 0.55);
@@ -24,7 +23,6 @@
 }
 
 /* DARK MODE */
-
 body.dark {
   --bg-gradient: linear-gradient(135deg, #0f172a, #1e293b, #0f172a);
   --glass-bg: rgba(30, 41, 59, 0.55);
@@ -47,18 +45,13 @@ body.dark {
 }
 
 /* =========================================
-   GLOBAL RESET
+   GLOBAL RESET & DASHBOARD LAYOUT
 ========================================= */
-
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
-
-/* =========================================
-   ANIMATED BACKGROUND
-========================================= */
 
 body {
   font-family: "Inter", "Segoe UI", sans-serif;
@@ -67,7 +60,7 @@ body {
   animation: gradientMove 15s ease infinite;
   color: var(--text);
   min-height: 100vh;
-  transition: color 0.3s ease;
+  overflow: hidden; /* Prevents double scrollbars */
 }
 
 @keyframes gradientMove {
@@ -76,33 +69,112 @@ body {
   100% { background-position: 0% 50%; }
 }
 
-/* =========================================
-   MAIN WRAPPER
-========================================= */
-
-div {
-  max-width: 1200px;
-  margin: auto;
+.dashboard-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
 }
 
 /* =========================================
-   HEADER GLASS EFFECT
+   SIDEBAR STYLES
 ========================================= */
+.sidebar {
+  width: 260px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-right: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  padding: 30px 20px;
+  flex-shrink: 0;
+  z-index: 100;
+}
 
-h2 {
-  font-size: 24px;
-  font-weight: 600;
+.sidebar-header {
+  margin-bottom: 40px;
+}
+
+.sidebar-header h2 {
   color: var(--primary);
+  font-size: 22px;
+  letter-spacing: -0.5px;
+}
+
+.sidebar-header p {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.nav-links {
+  list-style: none;
+  flex-grow: 1;
+}
+
+.nav-links li {
+  padding: 14px 18px;
   margin-bottom: 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-links li:hover {
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--primary);
+}
+
+.nav-links li.active {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3);
+}
+
+.sidebar-footer {
+  border-top: 1px solid var(--glass-border);
+  padding-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.logout-btn {
+  background: rgba(239, 68, 68, 0.1) !important;
+  color: #ef4444 !important;
+}
+
+.logout-btn:hover {
+  background: #ef4444 !important;
+  color: white !important;
 }
 
 /* =========================================
-   GLASS PANELS
+   MAIN CONTENT AREA
 ========================================= */
+.main-content {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 40px;
+  position: relative;
+}
 
+.content-header {
+  margin-bottom: 30px;
+}
+
+/* =========================================
+   GLASS PANELS (Forms, Cards, Tables)
+========================================= */
 form,
-div[style*="marginBottom"],
-table {
+.filter-bar,
+table,
+.glass-card {
   background: var(--glass-bg);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
@@ -112,84 +184,77 @@ table {
   transition: 0.3s ease;
 }
 
-form:hover,
-div[style*="marginBottom"]:hover,
-table:hover {
+form:hover, .filter-bar:hover, table:hover, .glass-card:hover {
   box-shadow: var(--shadow-strong);
 }
-
-/* FORM LAYOUT */
 
 form {
   display: flex;
   flex-wrap: wrap;
   gap: 14px;
   padding: 22px;
-  margin: 20px 0;
+  margin-bottom: 30px;
 }
 
-/* FILTER BAR */
-
-div[style*="marginBottom"] {
+.filter-bar {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   padding: 18px;
-  margin: 20px 0;
+  margin-bottom: 30px;
 }
 
 /* =========================================
-   INPUTS
+   ANALYTICS & CARDS
 ========================================= */
+.glass-card h1 {
+  font-size: 2.5rem;
+  margin: 10px 0;
+  font-weight: 700;
+}
 
-input,
-select {
+.glass-card h3 {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+/* =========================================
+   INPUTS & BUTTONS
+========================================= */
+input, select {
   padding: 11px 14px;
   border-radius: 14px;
   border: 1px solid var(--glass-border);
   background: var(--glass-strong);
   color: var(--text);
-  font-size: 14px;
   transition: 0.2s ease;
 }
 
-body.dark input,
-body.dark select {
+body.dark input, body.dark select {
   background: rgba(255, 255, 255, 0.05);
 }
 
-input:focus,
-select:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
-}
-
-/* =========================================
-   BUTTONS
-========================================= */
-
 button {
-  padding: 10px 18px;
-  border-radius: 16px;
+  padding: 10px 20px;
+  border-radius: 14px;
   border: none;
   background: var(--primary);
   color: white;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   transition: 0.25s ease;
 }
 
 button:hover {
-  background: var(--primary-hover);
   transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(37, 99, 235, 0.4);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3);
 }
 
 /* =========================================
-   TABLE
+   TABLE STYLES
 ========================================= */
-
 table {
   width: 100%;
   border-collapse: collapse;
@@ -197,171 +262,68 @@ table {
   overflow: hidden;
 }
 
-/* =========================================
-   TABLE HEADER (PREMIUM CONTRAST)
-========================================= */
-
 thead {
-  background: linear-gradient(
-    135deg,
-    rgba(37, 99, 235, 0.9),
-    rgba(29, 78, 216, 0.9)
-  );
-  color: white;
-  backdrop-filter: blur(12px);
-}
-
-body.dark thead {
-  background: linear-gradient(
-    135deg,
-    rgba(59, 130, 246, 0.8),
-    rgba(30, 64, 175, 0.85)
-  );
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.9), rgba(29, 78, 216, 0.9));
   color: white;
 }
 
 th {
-  padding: 16px 12px;
-  font-size: 12px;
+  padding: 18px 15px;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  font-weight: 600;
-}
-
-
-body.dark thead {
-  background: rgba(255, 255, 255, 0.05);
-}
-
-th {
-  padding: 16px 12px;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-align: left;
 }
 
 td {
-  padding: 15px 12px;
+  padding: 16px 15px;
   font-size: 14px;
   border-bottom: 1px solid var(--glass-border);
-  transition: 0.2s ease;
 }
 
-tr:hover td {
-  background: rgba(255, 255, 255, 0.08);
+tr:hover td { background: rgba(255, 255, 255, 0.05); }
+
+/* Status Badges */
+.status-open, .status-progress, .status-closed, .status-important {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.status-open { background: rgba(239, 68, 68, 0.15); color: var(--status-open); }
+.status-progress { background: rgba(245, 158, 11, 0.15); color: var(--status-progress); }
+.status-closed { background: rgba(34, 197, 94, 0.15); color: var(--status-closed); }
+.status-important { 
+    background: rgba(220, 38, 38, 0.2); 
+    color: var(--status-important); 
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.3);
 }
 
 /* =========================================
-   STATUS BADGES (GLOWING PILLS)
+   TABLE VARIANTS
 ========================================= */
+.incident-table.important thead { background: linear-gradient(135deg, #dc2626, #991b1b); }
+.incident-table.pending thead { background: linear-gradient(135deg, #f59e0b, #b45309); }
+.incident-table.resolved thead { background: linear-gradient(135deg, #10b981, #065f46); }
 
-.status-open,
-.status-progress,
-.status-closed,
-.status-important {
-  padding: 6px 14px;
-  border-radius: 999px;
-  font-weight: 600;
-  display: inline-block;
-  font-size: 12px;
+/* =========================================
+   ANIMATIONS
+========================================= */
+.view-fade-in {
+  animation: fadeIn 0.4s ease-out;
 }
 
-.status-open {
-  background: rgba(239, 68, 68, 0.15);
-  color: var(--status-open);
-}
-
-.status-progress {
-  background: rgba(245, 158, 11, 0.15);
-  color: var(--status-progress);
-}
-
-.status-closed {
-  background: rgba(34, 197, 94, 0.15);
-  color: var(--status-closed);
-}
-
-.status-important {
-  background: rgba(220, 38, 38, 0.2);
-  color: var(--status-important);
-  box-shadow: 0 0 12px rgba(220, 38, 38, 0.4);
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* =========================================
    RESPONSIVE
 ========================================= */
-
-@media (max-width: 900px) {
-  form,
-  div[style*="marginBottom"] {
-    flex-direction: column;
-  }
-
-  input,
-  select,
-  button {
-    width: 100%;
-  }
-
-  table {
-    font-size: 12px;
-  }
+@media (max-width: 1024px) {
+  .sidebar { width: 80px; padding: 20px 10px; }
+  .sidebar-header h2, .sidebar-header p, .nav-links span { display: none; }
+  .nav-links li { justify-content: center; padding: 15px; }
 }
-/* =========================================
-   TABLE COLOR VARIANTS (ADDED SAFELY)
-   Only overrides header background
-========================================= */
-
-/* 🔴 Important Table */
-.incident-table.important thead {
-  background: linear-gradient(
-    135deg,
-    rgba(220, 38, 38, 0.9),
-    rgba(153, 27, 27, 0.9)
-  );
-}
-
-/* 🟡 Pending Table */
-.incident-table.pending thead {
-  background: linear-gradient(
-    135deg,
-    rgba(245, 158, 11, 0.9),
-    rgba(202, 138, 4, 0.9)
-  );
-}
-
-/* 🟢 Resolved Table */
-.incident-table.resolved thead {
-  background: linear-gradient(
-    135deg,
-    rgba(34, 197, 94, 0.9),
-    rgba(21, 128, 61, 0.9)
-  );
-}
-
-/* Dark mode versions */
-body.dark .incident-table.important thead {
-  background: linear-gradient(
-    135deg,
-    rgba(239, 68, 68, 0.8),
-    rgba(127, 29, 29, 0.85)
-  );
-}
-
-body.dark .incident-table.pending thead {
-  background: linear-gradient(
-    135deg,
-    rgba(251, 191, 36, 0.8),
-    rgba(161, 98, 7, 0.85)
-  );
-}
-
-body.dark .incident-table.resolved thead {
-  background: linear-gradient(
-    135deg,
-    rgba(74, 222, 128, 0.8),
-    rgba(21, 128, 61, 0.85)
-  );
-}
-
