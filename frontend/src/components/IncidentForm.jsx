@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { formatTimestamp } from "../utils/time";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
 
@@ -7,12 +6,12 @@ function IncidentForm({
   onAdd,
   onUpdate,
   editingIncident,
-  companies,
+  companies, // Expected: [{name, group_name, information}, ...]
   setCompanies,
   categories,
   setCategories,
   operator,
-  role // ✅ added role prop
+  role
 }) {
 
   const initialState = {
@@ -27,18 +26,10 @@ function IncidentForm({
   // 🔒 Validation helper
   const isValidName = (name) => {
     if (!name) return false;
-
     const trimmed = name.trim();
-
-    if (trimmed.length < 2) return false;
-    if (trimmed.length > 50) return false;
-
-    // Must contain at least one letter or number
+    if (trimmed.length < 2 || trimmed.length > 50) return false;
     if (!/[a-zA-Z0-9]/.test(trimmed)) return false;
-
-    // Allow only letters, numbers, spaces, dash and underscore
     if (!/^[a-zA-Z0-9 _-]+$/.test(trimmed)) return false;
-
     return true;
   };
 
@@ -63,60 +54,12 @@ function IncidentForm({
   const handleChange = async (e) => {
     const { name, value } = e.target;
 
-    // ➕ ADD NEW COMPANY
-    if (name === "company" && value === "ADD_NEW_COMPANY") {
-      const input = prompt("Enter new company name:");
-      if (!input) return;
-
-      const newCompany = input.trim();
-
-      if (!isValidName(newCompany)) {
-        alert("Invalid company name. Use letters and numbers only (min 2 characters).");
-        return;
-      }
-
-      if (companies.includes(newCompany)) {
-        alert("Company already exists.");
-        setFormData(prev => ({ ...prev, company: newCompany }));
-        return;
-      }
-
-      try {
-        const response = await fetch(`${API_URL}/companies`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Username": operator
-          },
-          body: JSON.stringify({ name: newCompany })
-        });
-
-        if (!response.ok) {
-          alert("Error creating company.");
-          return;
-        }
-
-        const updated = await fetch(`${API_URL}/companies`)
-          .then(res => res.json());
-
-        setCompanies(updated);
-        setFormData(prev => ({ ...prev, company: newCompany }));
-
-      } catch (error) {
-        console.error(error);
-        alert("Server error.");
-      }
-
-      return;
-    }
-
-    // ➕ ADD NEW CATEGORY
+    // ➕ ADD NEW CATEGORY (Logic remains here as per your workflow)
     if (name === "category" && value === "ADD_NEW_CATEGORY") {
       const input = prompt("Enter new category name:");
       if (!input) return;
 
       const newCategory = input.trim();
-
       if (!isValidName(newCategory)) {
         alert("Invalid category name. Use letters and numbers only (min 2 characters).");
         return;
@@ -143,17 +86,13 @@ function IncidentForm({
           return;
         }
 
-        const updated = await fetch(`${API_URL}/categories`)
-          .then(res => res.json());
-
+        const updated = await fetch(`${API_URL}/categories`).then(res => res.json());
         setCategories(updated);
         setFormData(prev => ({ ...prev, category: newCategory }));
 
       } catch (error) {
-        console.error(error);
-        alert("Server error.");
+        console.error("Server error:", error);
       }
-
       return;
     }
 
@@ -166,33 +105,17 @@ function IncidentForm({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
-    const incidentData = {
-      ...formData,
-      operator,
-      id: editingIncident?.id
-    };
-
-    if (editingIncident) {
-      onUpdate(incidentData);
-    } else {
-      onAdd(incidentData);
-    }
-
+    const incidentData = { ...formData, operator, id: editingIncident?.id };
+    editingIncident ? onUpdate(incidentData) : onAdd(incidentData);
     resetForm();
   };
 
   return (
-    <form onSubmit={handleSubmit} style={{ marginBottom: "20px" }}>
+    <form onSubmit={handleSubmit} className="incident-form-container" style={{ marginBottom: "20px" }}>
 
       {/* SHIFT */}
       <div style={{ marginBottom: "10px" }}>
-        <select
-          name="shift"
-          value={formData.shift}
-          onChange={handleChange}
-          required
-        >
+        <select name="shift" value={formData.shift} onChange={handleChange} required>
           <option value="">Select Shift</option>
           <option value="Morning">Morning</option>
           <option value="Evening">Evening</option>
@@ -200,7 +123,7 @@ function IncidentForm({
         </select>
       </div>
 
-      {/* COMPANY */}
+      {/* COMPANY (Synced with Company Hub) */}
       <div style={{ marginBottom: "10px" }}>
         <select
           name="company"
@@ -209,50 +132,14 @@ function IncidentForm({
           required
         >
           <option value="">Select Company</option>
-
+          {/* ✅ Fixed: Mapping through company objects safely */}
           {companies.map((company, index) => (
-            <option key={index} value={company}>
-              {company}
+            <option key={index} value={company.name}>
+              {company.name}
             </option>
           ))}
-
-          {role !== "operator" && (
-            <option value="ADD_NEW_COMPANY">➕ Add new company</option>
-          )}
         </select>
-
-        {formData.company &&
-         formData.company !== "ADD_NEW_COMPANY" &&
-         role !== "operator" && (
-          <button
-            type="button"
-            style={{ marginLeft: "10px" }}
-            onClick={async () => {
-              if (!window.confirm("Delete this company?")) return;
-
-              const response = await fetch(
-                `${API_URL}/companies/${encodeURIComponent(formData.company)}`,
-                {
-                  method: "DELETE",
-                  headers: { "Username": operator }
-                }
-              );
-
-              if (!response.ok) {
-                alert("No se puede eliminar, compañia en uso");
-                return;
-              }
-
-              const updated = await fetch(`${API_URL}/companies`)
-                .then(res => res.json());
-
-              setCompanies(updated);
-              setFormData(prev => ({ ...prev, company: "" }));
-            }}
-          >
-            🗑
-          </button>
-        )}
+        {/* Note: "Add Company" is now handled via the Company Hub Tab */}
       </div>
 
       {/* CATEGORY */}
@@ -264,13 +151,11 @@ function IncidentForm({
           required
         >
           <option value="">Select Category</option>
-
           {categories.map((category, index) => (
             <option key={index} value={category}>
               {category}
             </option>
           ))}
-
           {role !== "operator" && (
             <option value="ADD_NEW_CATEGORY">➕ Add new category</option>
           )}
@@ -284,23 +169,15 @@ function IncidentForm({
             style={{ marginLeft: "10px" }}
             onClick={async () => {
               if (!window.confirm("Delete this category?")) return;
-
-              const response = await fetch(
-                `${API_URL}/categories/${encodeURIComponent(formData.category)}`,
-                {
-                  method: "DELETE",
-                  headers: { "Username": operator }
-                }
-              );
-
+              const response = await fetch(`${API_URL}/categories/${encodeURIComponent(formData.category)}`, {
+                method: "DELETE",
+                headers: { "Username": operator }
+              });
               if (!response.ok) {
                 alert("No se puede eliminar, categoria en uso");
                 return;
               }
-
-              const updated = await fetch(`${API_URL}/categories`)
-                .then(res => res.json());
-
+              const updated = await fetch(`${API_URL}/categories`).then(res => res.json());
               setCategories(updated);
               setFormData(prev => ({ ...prev, category: "" }));
             }}
@@ -331,7 +208,7 @@ function IncidentForm({
         />
       </div>
 
-      <button type="submit">
+      <button type="submit" className="submit-btn">
         {editingIncident ? "Update Incident" : "Add Incident"}
       </button>
 

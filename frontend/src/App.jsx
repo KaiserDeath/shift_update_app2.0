@@ -4,16 +4,17 @@ import IncidentTable from "./components/IncidentTable";
 import ImportantTable from "./components/ImportantTable";
 import Login from "./components/Login";
 import AdminPanel from "./components/AdminPanel";
-import Analytics from "./components/Analytics"; // ✅ New Analytics Import
+import Analytics from "./components/Analytics";
+import CompanyHub from "./components/CompanyHub"; // ✅ New Import
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
 
 function App() {
   const [incidents, setIncidents] = useState([]);
-  const [companies, setCompanies] = useState([]);
+  const [companies, setCompanies] = useState([]); // Will now hold [{name, group_name, information}, ...]
   const [categories, setCategories] = useState([]);
   const [editingIncident, setEditingIncident] = useState(null);
-  const [activeTab, setActiveTab] = useState("dashboard"); // ✅ State for Tabs
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [user, setUser] = useState(() => {
     const storedUser = localStorage.getItem("user");
     return storedUser ? JSON.parse(storedUser) : null;
@@ -31,7 +32,7 @@ function App() {
     () => localStorage.getItem("theme") === "dark"
   );
 
-  // 🌗 DARK MODE EFFECT (Kept from original)
+  // 🌗 DARK MODE EFFECT
   useEffect(() => {
     if (darkMode) {
       document.body.classList.add("dark");
@@ -42,7 +43,7 @@ function App() {
     }
   }, [darkMode]);
 
-  // ✅ DATA LOADING EFFECT (Kept from original)
+  // ✅ DATA LOADING EFFECT
   useEffect(() => {
     if (!user) return;
     loadData();
@@ -64,14 +65,14 @@ function App() {
       ]);
 
       setIncidents(await incRes.json());
-      setCompanies(await compRes.json());
+      setCompanies(await compRes.json()); // Backend now returns objects
       setCategories(await catRes.json());
     } catch (error) {
       console.error("Error loading data:", error);
     }
   };
 
-  // --- ORIGINAL CRUD LOGIC (UNTOUCHED) ---
+  // --- CRUD LOGIC ---
   const addIncident = async (incident) => {
     try {
       const response = await fetch(`${API_URL}/incidents`, {
@@ -129,6 +130,7 @@ function App() {
         
         <ul className="nav-links">
           <li className={activeTab === "dashboard" ? "active" : ""} onClick={() => setActiveTab("dashboard")}>📋 Incidents</li>
+          <li className={activeTab === "hub" ? "active" : ""} onClick={() => setActiveTab("hub")}>🏢 Company Hub</li>
           <li className={activeTab === "analytics" ? "active" : ""} onClick={() => setActiveTab("analytics")}>📊 Analytics</li>
           {user.role === "admin" && (
             <li className={activeTab === "users" ? "active" : ""} onClick={() => setActiveTab("users")}>👥 Users</li>
@@ -157,19 +159,20 @@ function App() {
               onAdd={addIncident}
               onUpdate={updateIncident}
               editingIncident={editingIncident}
-              companies={companies}
+              companies={companies} // Passing objects now
               setCompanies={setCompanies}
               categories={categories}
               setCategories={setCategories}
               operator={user.username}
               role={user.role}
+              API_URL={API_URL}
             />
 
-            {/* FILTER BAR (Improved styling class) */}
             <div className="filter-bar">
               <select value={filters.company} onChange={(e) => setFilters({ ...filters, company: e.target.value })}>
                 <option value="">All Companies</option>
-                {companies.map(c => <option key={c} value={c}>{c}</option>)}
+                {/* Fixed Error #31 by mapping c.name */}
+                {companies.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
               </select>
 
               <select value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}>
@@ -186,6 +189,15 @@ function App() {
             <IncidentTable incidents={incidents.filter(i => i.status === "Pending")} variant="pending" onStatusChange={updateStatus} onDelete={deleteIncident} onEdit={setEditingIncident} />
             <IncidentTable incidents={incidents.filter(i => i.status === "Resolved")} variant="resolved" onStatusChange={updateStatus} onDelete={deleteIncident} onEdit={setEditingIncident} />
           </div>
+        )}
+
+        {activeTab === "hub" && (
+            <CompanyHub 
+                companies={companies} 
+                setCompanies={setCompanies} 
+                API_URL={API_URL} 
+                user={user} 
+            />
         )}
 
         {activeTab === "analytics" && <Analytics incidents={incidents} />}
