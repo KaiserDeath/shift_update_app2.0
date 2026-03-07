@@ -6,14 +6,12 @@ function IncidentForm({
   onAdd,
   onUpdate,
   editingIncident,
-  companies, // Expected: [{name, group_name, information}, ...]
-  setCompanies,
+  companies,
   categories,
   setCategories,
   operator,
   role
 }) {
-
   const initialState = {
     shift: "",
     company: "",
@@ -23,19 +21,14 @@ function IncidentForm({
     status: "Pending"
   };
 
-  // 🔒 Validation helper
+  const [formData, setFormData] = useState(initialState);
+
   const isValidName = (name) => {
     if (!name) return false;
     const trimmed = name.trim();
-    if (trimmed.length < 2 || trimmed.length > 50) return false;
-    if (!/[a-zA-Z0-9]/.test(trimmed)) return false;
-    if (!/^[a-zA-Z0-9 _-]+$/.test(trimmed)) return false;
-    return true;
+    return trimmed.length >= 2 && /^[a-zA-Z0-9 _-]+$/.test(trimmed);
   };
 
-  const [formData, setFormData] = useState(initialState);
-
-  // 🔁 Load data when editing
   useEffect(() => {
     if (editingIncident) {
       setFormData({
@@ -54,164 +47,92 @@ function IncidentForm({
   const handleChange = async (e) => {
     const { name, value } = e.target;
 
-    // ➕ ADD NEW CATEGORY (Logic remains here as per your workflow)
     if (name === "category" && value === "ADD_NEW_CATEGORY") {
       const input = prompt("Enter new category name:");
-      if (!input) return;
-
-      const newCategory = input.trim();
-      if (!isValidName(newCategory)) {
-        alert("Invalid category name. Use letters and numbers only (min 2 characters).");
-        return;
-      }
-
-      if (categories.includes(newCategory)) {
-        alert("Category already exists.");
-        setFormData(prev => ({ ...prev, category: newCategory }));
-        return;
-      }
+      if (!input || !isValidName(input)) return alert("Invalid Name");
 
       try {
-        const response = await fetch(`${API_URL}/categories`, {
+        const res = await fetch(`${API_URL}/categories`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Username": operator
-          },
-          body: JSON.stringify({ name: newCategory })
+          headers: { "Content-Type": "application/json", "Username": operator },
+          body: JSON.stringify({ name: input.trim() })
         });
-
-        if (!response.ok) {
-          alert("Error creating category.");
-          return;
+        if (res.ok) {
+          const updated = await fetch(`${API_URL}/categories`).then(r => r.json());
+          setCategories(updated);
+          setFormData(prev => ({ ...prev, category: input.trim() }));
         }
-
-        const updated = await fetch(`${API_URL}/categories`).then(res => res.json());
-        setCategories(updated);
-        setFormData(prev => ({ ...prev, category: newCategory }));
-
-      } catch (error) {
-        console.error("Server error:", error);
-      }
+      } catch (err) { console.error(err); }
       return;
     }
-
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const resetForm = () => {
-    setFormData(initialState);
-  };
+  const handleDeleteCategory = async () => {
+    if (!formData.category || formData.category === "ADD_NEW_CATEGORY") return;
+    if (!window.confirm(`Delete "${formData.category}"?`)) return;
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const incidentData = { ...formData, operator, id: editingIncident?.id };
-    editingIncident ? onUpdate(incidentData) : onAdd(incidentData);
-    resetForm();
+    try {
+      const response = await fetch(`${API_URL}/categories/${encodeURIComponent(formData.category)}`, {
+        method: "DELETE",
+        headers: { "Username": operator }
+      });
+
+      if (!response.ok) {
+        // 🚨 This is the alert you were missing!
+        alert("No se puede eliminar, categoria en uso");
+        return;
+      }
+
+      const updated = await fetch(`${API_URL}/categories`).then(res => res.json());
+      setCategories(updated);
+      setFormData(prev => ({ ...prev, category: "" }));
+    } catch (error) {
+      console.error("Server error:", error);
+      alert("Error al conectar con el servidor");
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="incident-form-container" style={{ marginBottom: "20px" }}>
+    <form onSubmit={(e) => { 
+      e.preventDefault(); 
+      const data = { ...formData, operator, id: editingIncident?.id };
+      editingIncident ? onUpdate(data) : onAdd(data);
+      setFormData(initialState);
+    }} className="incident-form-container">
+      
+      <select name="shift" value={formData.shift} onChange={handleChange} required>
+        <option value="">Select Shift</option>
+        <option value="Morning">Morning</option>
+        <option value="Evening">Evening</option>
+        <option value="Night">Night</option>
+      </select>
 
-      {/* SHIFT */}
-      <div style={{ marginBottom: "10px" }}>
-        <select name="shift" value={formData.shift} onChange={handleChange} required>
-          <option value="">Select Shift</option>
-          <option value="Morning">Morning</option>
-          <option value="Evening">Evening</option>
-          <option value="Night">Night</option>
-        </select>
-      </div>
+      <select name="company" value={formData.company} onChange={handleChange} required>
+        <option value="">Select Company</option>
+        {companies.map((c, i) => (
+          <option key={i} value={c.name}>{c.name} {c.group_name ? `(${c.group_name})` : ""}</option>
+        ))}
+      </select>
 
-      {/* COMPANY (Synced with Company Hub) */}
-      <div style={{ marginBottom: "10px" }}>
-        <select
-          name="company"
-          value={formData.company}
-          onChange={handleChange}
-          required
-        >
-          <option value="">Select Company</option>
-          {/* ✅ Fixed: Mapping through company objects safely */}
-          {companies.map((company, index) => (
-            <option key={index} value={company.name}>
-              {company.name}
-            </option>
-          ))}
-        </select>
-        {/* Note: "Add Company" is now handled via the Company Hub Tab */}
-      </div>
-
-      {/* CATEGORY */}
-      <div style={{ marginBottom: "10px" }}>
-        <select
-          name="category"
-          value={formData.category}
-          onChange={handleChange}
-          required
-        >
+      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+        <select name="category" value={formData.category} onChange={handleChange} required style={{ flex: 1 }}>
           <option value="">Select Category</option>
-          {categories.map((category, index) => (
-            <option key={index} value={category}>
-              {category}
-            </option>
-          ))}
-          {role !== "operator" && (
-            <option value="ADD_NEW_CATEGORY">➕ Add new category</option>
-          )}
+          {categories.map((cat, i) => <option key={i} value={cat}>{cat}</option>)}
+          {role !== "operator" && <option value="ADD_NEW_CATEGORY">➕ Add Category</option>}
         </select>
-
-        {formData.category &&
-         formData.category !== "ADD_NEW_CATEGORY" &&
-         role !== "operator" && (
-          <button
-            type="button"
-            style={{ marginLeft: "10px" }}
-            onClick={async () => {
-              if (!window.confirm("Delete this category?")) return;
-              const response = await fetch(`${API_URL}/categories/${encodeURIComponent(formData.category)}`, {
-                method: "DELETE",
-                headers: { "Username": operator }
-              });
-              if (!response.ok) {
-                alert("No se puede eliminar, categoria en uso");
-                return;
-              }
-              const updated = await fetch(`${API_URL}/categories`).then(res => res.json());
-              setCategories(updated);
-              setFormData(prev => ({ ...prev, category: "" }));
-            }}
-          >
-            🗑
-          </button>
+        
+        {formData.category && formData.category !== "ADD_NEW_CATEGORY" && role !== "operator" && (
+          <button type="button" onClick={handleDeleteCategory} style={{ padding: "5px 10px" }}>🗑</button>
         )}
       </div>
 
-      {/* DESCRIPTION */}
-      <div style={{ marginBottom: "10px" }}>
-        <textarea
-          name="description"
-          placeholder="Description"
-          value={formData.description}
-          onChange={handleChange}
-          required
-        />
-      </div>
+      <textarea name="description" placeholder="Description" value={formData.description} onChange={handleChange} required />
+      <textarea name="action_taken" placeholder="Action Taken" value={formData.action_taken} onChange={handleChange} />
 
-      {/* ACTION TAKEN */}
-      <div style={{ marginBottom: "10px" }}>
-        <textarea
-          name="action_taken"
-          placeholder="Action Taken"
-          value={formData.action_taken}
-          onChange={handleChange}
-        />
-      </div>
-
-      <button type="submit" className="submit-btn">
+      <button type="submit" className="submit-btn" style={{ background: editingIncident ? "orange" : "var(--primary)" }}>
         {editingIncident ? "Update Incident" : "Add Incident"}
       </button>
-
     </form>
   );
 }

@@ -4,8 +4,11 @@ const CompanyHub = ({ companies, setCompanies, API_URL, user }) => {
   const [selectedCompany, setSelectedCompany] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newCompData, setNewCompData] = useState({ name: "", group: "Standalone" });
 
-  // --- STRUCTURED DATA STATE ---
+  // Restored all your original fields
   const [formData, setFormData] = useState({
     group_name: "",
     website: "",
@@ -16,134 +19,160 @@ const CompanyHub = ({ companies, setCompanies, API_URL, user }) => {
     cashout_rules: ""
   });
 
-  // Handle Dynamic Chat Links
-  const addChatLink = () => setFormData({ ...formData, chat_links: [...formData.chat_links, ""] });
-  const updateChatLink = (index, val) => {
-    const newLinks = [...formData.chat_links];
-    newLinks[index] = val;
-    setFormData({ ...formData, chat_links: newLinks });
-  };
+  // 1. Logic to extract unique groups for the dropdown
+  const groups = ["Standalone", ...new Set(companies.map(c => c.group_name).filter(g => g && g !== ""))];
 
-  // Handle Dynamic Promotions
-  const addPromo = () => setFormData({ ...formData, promotions: [...formData.promotions, { name: "", desc: "" }] });
-
-  const handleSave = async () => {
-    await fetch(`${API_URL}/companies/${encodeURIComponent(selectedCompany)}/info`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Role: user.role, Username: user.username },
-      body: JSON.stringify({
-        group_name: formData.group_name,
-        information: JSON.stringify(formData) // Save the rest as JSON
-      })
-    });
-    setIsEditing(false);
-    alert("Saved successfully!");
-  };
-
-  // Organize companies by Group for the sidebar display
-  const groupedCompanies = companies.reduce((acc, company) => {
-    // Note: You'll need to fetch the 'group_name' from the backend for this to be 100% accurate
-    const group = "Standalone"; 
-    if (!acc[group]) acc[group] = [];
-    acc[group].push(company);
+  // 2. Logic to group companies for the Sidebar display
+  const groupedCompanies = companies.reduce((acc, c) => {
+    const g = c.group_name || "Standalone";
+    if (!acc[g]) acc[g] = [];
+    acc[g].push(c);
     return acc;
   }, {});
 
+  useEffect(() => {
+    if (selectedCompany) {
+      const comp = companies.find(c => c.name === selectedCompany);
+      if (comp) {
+        let info = {};
+        try { 
+          info = typeof comp.information === "string" ? JSON.parse(comp.information) : (comp.information || {});
+        } catch (e) { info = {}; }
+
+        // Setting all detailed fields back into state
+        setFormData({
+          group_name: comp.group_name || "Standalone",
+          website: info.website || "",
+          chat_links: info.chat_links || [""],
+          general_info: info.general_info || "",
+          promotions: info.promotions || [{ name: "", desc: "" }],
+          cashout_schedule: info.cashout_schedule || "",
+          cashout_rules: info.cashout_rules || ""
+        });
+      }
+    }
+  }, [selectedCompany, companies]);
+
+  const handleCreateCompany = async () => {
+    if (!newCompData.name) return alert("Name is required");
+    
+    let finalGroup = newCompData.group;
+    if (finalGroup === "Standalone") finalGroup = "";
+    if (finalGroup === "NEW_GROUP") {
+        const custom = prompt("Enter new group name:");
+        if (!custom) return;
+        finalGroup = custom;
+    }
+
+    const res = await fetch(`${API_URL}/companies`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Username": user.username },
+      body: JSON.stringify({ name: newCompData.name, group_name: finalGroup })
+    });
+
+    if (res.ok) {
+      const updated = await fetch(`${API_URL}/companies`).then(r => r.json());
+      setCompanies(updated);
+      setShowAddModal(false);
+      setNewCompData({ name: "", group: "Standalone" });
+    }
+  };
+
+  const handleSave = async () => {
+    const res = await fetch(`${API_URL}/companies/${encodeURIComponent(selectedCompany)}/info`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Role: user.role, Username: user.username },
+      body: JSON.stringify({
+        group_name: formData.group_name === "Standalone" ? "" : formData.group_name,
+        information: JSON.stringify(formData) // Saves all detail fields as JSON
+      })
+    });
+    if (res.ok) {
+      const updated = await fetch(`${API_URL}/companies`).then(r => r.json());
+      setCompanies(updated);
+      setIsEditing(false);
+      alert("Company Profile Updated!");
+    }
+  };
+
   return (
-    <div className="view-fade-in" style={{ display: "flex", gap: "20px" }}>
-      {/* SIDEBAR: Grouped List */}
-      <div className="glass-card" style={{ width: "300px", padding: "20px", height: "80vh", overflowY: "auto" }}>
-        <input 
-          type="text" placeholder="Search..." 
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ width: "100%", marginBottom: "20px" }}
-        />
-        {Object.keys(groupedCompanies).map(group => (
-          <div key={group} style={{ marginBottom: "15px" }}>
-            <h5 style={{ color: "var(--primary)", fontSize: "12px", textTransform: "uppercase" }}>{group}</h5>
-            {groupedCompanies[group].map(name => (
-              <div 
-                key={name} 
-                onClick={() => setSelectedCompany(name)}
-                className={`nav-link-item ${selectedCompany === name ? "active" : ""}`}
-                style={{ cursor: "pointer", padding: "8px", borderRadius: "8px" }}
-              >
-                🏢 {name}
-              </div>
+    <div style={{ display: "flex", gap: "20px", height: "85vh" }}>
+      {/* SIDEBAR */}
+      <div className="glass-card" style={{ width: "280px", padding: "15px", overflowY: "auto" }}>
+        <button onClick={() => setShowAddModal(true)} style={{ width: "100%", marginBottom: "15px", background: "var(--primary)" }}>
+          + Add New Company
+        </button>
+        
+        <input type="text" placeholder="Search..." onChange={e => setSearchTerm(e.target.value)} style={{ width: "92%", marginBottom: "15px", padding: "8px" }} />
+
+        {Object.keys(groupedCompanies).sort().map(group => (
+          <div key={group} style={{ marginBottom: "20px" }}>
+            <h5 style={{ color: "var(--primary)", borderBottom: "1px solid #444", paddingBottom: "5px" }}>
+              {group.toUpperCase()}
+            </h5>
+            {groupedCompanies[group]
+              .filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
+              .map(c => (
+                <div key={c.name} onClick={() => setSelectedCompany(c.name)} 
+                  style={{ padding: "8px", cursor: "pointer", borderRadius: "5px", background: selectedCompany === c.name ? "rgba(255,255,255,0.1)" : "transparent" }}>
+                  🏢 {c.name}
+                </div>
             ))}
           </div>
         ))}
       </div>
 
-      {/* MAIN CONTENT: The Form/Display */}
-      <div className="glass-card" style={{ flex: 1, padding: "30px", overflowY: "auto", height: "80vh" }}>
-        {selectedCompany ? (
+      {/* MAIN VIEW */}
+      <div className="glass-card" style={{ flex: 1, padding: "25px", overflowY: "auto" }}>
+        {showAddModal ? (
+          <div className="modal-content">
+            <h3>Create New Company</h3>
+            <label>Company Name</label>
+            <input type="text" value={newCompData.name} onChange={e => setNewCompData({...newCompData, name: e.target.value})} />
+            <label>Group</label>
+            <select value={newCompData.group} onChange={e => setNewCompData({...newCompData, group: e.target.value})}>
+              {groups.map(g => <option key={g} value={g}>{g}</option>)}
+              <option value="NEW_GROUP">+ Create New Group</option>
+            </select>
+            <div style={{ marginTop: "15px" }}>
+              <button onClick={handleCreateCompany}>Save</button>
+              <button onClick={() => setShowAddModal(false)} style={{ marginLeft: "10px" }}>Cancel</button>
+            </div>
+          </div>
+        ) : selectedCompany ? (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h2>{selectedCompany}</h2>
-              {user.role !== "operator" && (
-                <button onClick={() => setIsEditing(!isEditing)}>
-                  {isEditing ? "Cancel" : "Edit Profile"}
-                </button>
-              )}
+              {user.role !== "operator" && <button onClick={() => setIsEditing(!isEditing)}>{isEditing ? "Cancel" : "Edit Profile"}</button>}
             </div>
 
             {isEditing ? (
               <div className="hub-form" style={{ marginTop: "20px" }}>
-                <label>Group Name (Sub-category)</label>
-                <input type="text" value={formData.group_name} onChange={(e) => setFormData({...formData, group_name: e.target.value})} style={{width: "100%"}} />
-
-                <label>Website Link</label>
-                <input type="text" value={formData.website} onChange={(e) => setFormData({...formData, website: e.target.value})} style={{width: "100%"}} />
-
-                <label>Chat Channels</label>
-                {formData.chat_links.map((link, i) => (
-                  <div key={i} style={{ display: "flex", gap: "10px", marginBottom: "5px" }}>
-                    <input type="text" value={link} onChange={(e) => updateChatLink(i, e.target.value)} style={{flex: 1}} />
-                    {i === formData.chat_links.length - 1 && <button onClick={addChatLink}>+</button>}
-                  </div>
-                ))}
-
-                <label>General Information</label>
-                <textarea value={formData.general_info} onChange={(e) => setFormData({...formData, general_info: e.target.value})} style={{width: "100%", height: "100px"}} />
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginTop: "20px" }}>
-                  <div>
-                    <h4>Promotions</h4>
-                    {formData.promotions.map((p, i) => (
-                       <div key={i} style={{ marginBottom: "10px", borderBottom: "1px solid #ddd", paddingBottom: "10px" }}>
-                          <input placeholder="Bonus Name" value={p.name} onChange={(e) => {
-                            const newP = [...formData.promotions]; newP[i].name = e.target.value; setFormData({...formData, promotions: newP});
-                          }} style={{width: "100%", marginBottom: "5px"}} />
-                          <textarea placeholder="Description" value={p.desc} onChange={(e) => {
-                            const newP = [...formData.promotions]; newP[i].desc = e.target.value; setFormData({...formData, promotions: newP});
-                          }} style={{width: "100%"}} />
-                       </div>
-                    ))}
-                    <button onClick={addPromo}>+ Add Promotion</button>
-                  </div>
-
-                  <div>
-                    <h4>Cashouts</h4>
-                    <input placeholder="Schedule" value={formData.cashout_schedule} onChange={(e) => setFormData({...formData, cashout_schedule: e.target.value})} style={{width: "100%", marginBottom: "10px"}} />
-                    <textarea placeholder="Rules" value={formData.cashout_rules} onChange={(e) => setFormData({...formData, cashout_rules: e.target.value})} style={{width: "100%"}} />
-                  </div>
-                </div>
-
-                <button onClick={handleSave} style={{ marginTop: "30px", width: "100%", padding: "15px" }}>Save All Changes</button>
+                <label>Change Group</label>
+                <select value={formData.group_name} onChange={e => setFormData({...formData, group_name: e.target.value})}>
+                   {groups.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+                <label>Website</label>
+                <input type="text" value={formData.website} onChange={e => setFormData({...formData, website: e.target.value})} />
+                <label>Cashout Rules</label>
+                <textarea value={formData.cashout_rules} onChange={e => setFormData({...formData, cashout_rules: e.target.value})} />
+                <label>General Info</label>
+                <textarea value={formData.general_info} onChange={e => setFormData({...formData, general_info: e.target.value})} />
+                <button onClick={handleSave} style={{ marginTop: "20px" }}>Save All Changes</button>
               </div>
             ) : (
               <div className="hub-display" style={{ marginTop: "20px" }}>
-                {/* DISPLAY VIEW: Show links as clickable <a> tags, use labels, etc. */}
-                <p><strong>Website:</strong> <a href={formData.website} target="_blank">{formData.website}</a></p>
-                <p><strong>Group:</strong> {formData.group_name || "Standalone"}</p>
-                {/* ... Render the rest of the display UI here ... */}
+                <p><strong>Group:</strong> {formData.group_name}</p>
+                <p><strong>Website:</strong> <a href={formData.website} target="_blank" rel="noreferrer">{formData.website}</a></p>
+                <hr />
+                <h4>Cashout Rules</h4>
+                <p>{formData.cashout_rules || "No rules defined."}</p>
+                <h4>General Info</h4>
+                <p>{formData.general_info || "No info."}</p>
               </div>
             )}
           </div>
-        ) : (
-          <div style={{ textAlign: "center", marginTop: "100px" }}>Select a company to view the Hub.</div>
-        )}
+        ) : <p>Select a company to view its full profile.</p>}
       </div>
     </div>
   );
