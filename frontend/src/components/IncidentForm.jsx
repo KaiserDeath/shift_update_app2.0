@@ -22,6 +22,9 @@ function IncidentForm({
   };
 
   const [formData, setFormData] = useState(initialState);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryPrivate, setNewCategoryPrivate] = useState(false);
 
   const isValidName = (name) => {
     if (!name) return false;
@@ -44,28 +47,45 @@ function IncidentForm({
     }
   }, [editingIncident]);
 
-  const handleChange = async (e) => {
-    const { name, value } = e.target;
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
 
     if (name === "category" && value === "ADD_NEW_CATEGORY") {
-      const input = prompt("Enter new category name:");
-      if (!input || !isValidName(input)) return alert("Invalid Name");
-
-      try {
-        const res = await fetch(`${API_URL}/categories`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Username": operator },
-          body: JSON.stringify({ name: input.trim() })
-        });
-        if (res.ok) {
-          const updated = await fetch(`${API_URL}/categories`).then(r => r.json());
-          setCategories(updated);
-          setFormData(prev => ({ ...prev, category: input.trim() }));
-        }
-      } catch (err) { console.error(err); }
+      if (role === "operator") return; // Operators cannot add categories
+      setNewCategoryName("");
+      setNewCategoryPrivate(false);
+      setShowCategoryModal(true);
       return;
     }
-    setFormData(prev => ({ ...prev, [name]: value }));
+
+    setFormData(prev => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+  };
+
+  const handleAddCategory = async () => {
+    if (!isValidName(newCategoryName)) return alert("Invalid category name");
+
+    try {
+      const res = await fetch(`${API_URL}/categories`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Username: operator },
+        body: JSON.stringify({ name: newCategoryName.trim(), private: newCategoryPrivate })
+      });
+
+      if (!res.ok) throw new Error("Failed to add category");
+
+      // Fetch updated categories from server
+      const updated = await fetch(`${API_URL}/categories`).then(r => r.json());
+      // Normalize to objects { name, private }
+      const normalized = updated.map(c => (typeof c === "string" ? { name: c, private: false } : { name: c.name, private: c.private ?? false }));
+      setCategories(normalized);
+
+      // Immediately update formData so select shows the new category
+      setFormData(prev => ({ ...prev, category: newCategoryName.trim() }));
+      setShowCategoryModal(false);
+    } catch (err) {
+      console.error(err);
+      alert("Error creating category");
+    }
   };
 
   const handleDeleteCategory = async () => {
@@ -79,61 +99,119 @@ function IncidentForm({
       });
 
       if (!response.ok) {
-        // 🚨 This is the alert you were missing!
-        alert("No se puede eliminar, categoria en uso");
+        alert("Cannot delete: category in use");
         return;
       }
 
       const updated = await fetch(`${API_URL}/categories`).then(res => res.json());
-      setCategories(updated);
+      const normalized = updated.map(c => (typeof c === "string" ? { name: c, private: false } : { name: c.name, private: c.private ?? false }));
+      setCategories(normalized);
       setFormData(prev => ({ ...prev, category: "" }));
     } catch (error) {
       console.error("Server error:", error);
-      alert("Error al conectar con el servidor");
+      alert("Error connecting to server");
     }
   };
 
   return (
-    <form onSubmit={(e) => { 
-      e.preventDefault(); 
-      const data = { ...formData, operator, id: editingIncident?.id };
-      editingIncident ? onUpdate(data) : onAdd(data);
-      setFormData(initialState);
-    }} className="incident-form-container">
-      
-      <select name="shift" value={formData.shift} onChange={handleChange} required>
-        <option value="">Select Shift</option>
-        <option value="Morning">Morning</option>
-        <option value="Evening">Evening</option>
-        <option value="Night">Night</option>
-      </select>
-
-      <select name="company" value={formData.company} onChange={handleChange} required>
-        <option value="">Select Company</option>
-        {companies.map((c, i) => (
-          <option key={i} value={c.name}>{c.name} {c.group_name ? `(${c.group_name})` : ""}</option>
-        ))}
-      </select>
-
-      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-        <select name="category" value={formData.category} onChange={handleChange} required style={{ flex: 1 }}>
-          <option value="">Select Category</option>
-          {categories.map((cat, i) => <option key={i} value={cat}>{cat}</option>)}
-          {role !== "operator" && <option value="ADD_NEW_CATEGORY">➕ Add Category</option>}
+    <>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const data = { ...formData, operator, id: editingIncident?.id };
+          editingIncident ? onUpdate(data) : onAdd(data);
+          setFormData(initialState);
+        }}
+        className="incident-form-container"
+      >
+        <select name="shift" value={formData.shift} onChange={handleChange} required>
+          <option value="">Select Shift</option>
+          <option value="Morning">Morning</option>
+          <option value="Evening">Evening</option>
+          <option value="Night">Night</option>
         </select>
-        
-        {formData.category && formData.category !== "ADD_NEW_CATEGORY" && role !== "operator" && (
-          <button type="button" onClick={handleDeleteCategory} style={{ padding: "5px 10px" }}>🗑</button>
-        )}
-      </div>
 
-      <textarea name="description" placeholder="Description" value={formData.description} onChange={handleChange} required />
-      <textarea name="action_taken" placeholder="Action Taken" value={formData.action_taken} onChange={handleChange} />
+        <select name="company" value={formData.company} onChange={handleChange} required>
+          <option value="">Select Company</option>
+          {companies.map((c, i) => (
+            <option key={i} value={c.name}>
+              {c.name} {c.group_name ? `(${c.group_name})` : ""}
+            </option>
+          ))}
+        </select>
 
-      <button type="submit" className="submit-btn" style={{ background: editingIncident ? "orange" : "var(--primary)" }}>
-        {editingIncident ? "Update Incident" : "Add Incident"}
-      </button>
-    </form>
+        <div className="category-select-wrapper">
+          <select
+            name="category"
+            value={formData.category}
+            onChange={handleChange}
+            required
+          >
+            <option value="">Select Category</option>
+            {categories
+              .filter(cat => (role === "operator" ? !cat.private : true))
+              .map((cat, i) => (
+                <option key={i} value={cat.name}>{cat.name}</option>
+              ))
+            }
+            {role !== "operator" && <option value="ADD_NEW_CATEGORY">➕ Add Category</option>}
+          </select>
+
+          {formData.category && formData.category !== "ADD_NEW_CATEGORY" && role !== "operator" && (
+            <button type="button" onClick={handleDeleteCategory} className="delete-category-btn">🗑</button>
+          )}
+        </div>
+
+        <textarea
+          name="description"
+          placeholder="Description"
+          value={formData.description}
+          onChange={handleChange}
+          required
+        />
+        <textarea
+          name="action_taken"
+          placeholder="Action Taken"
+          value={formData.action_taken}
+          onChange={handleChange}
+        />
+
+        <button
+          type="submit"
+          className="submit-btn"
+          style={{ background: editingIncident ? "orange" : "var(--primary)" }}
+        >
+          {editingIncident ? "Update Incident" : "Add Incident"}
+        </button>
+      </form>
+
+      {/* Category Modal */}
+      {showCategoryModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h3>Add New Category</h3>
+            <input
+              type="text"
+              placeholder="Category Name"
+              value={newCategoryName}
+              onChange={(e) => setNewCategoryName(e.target.value)}
+            />
+            <label className="private-checkbox">
+              <input
+                type="checkbox"
+                checked={newCategoryPrivate}
+                onChange={(e) => setNewCategoryPrivate(e.target.checked)}
+              />
+              Private (Only visible to supervisors/admins)
+            </label>
+            <div className="modal-btns">
+              <button type="button" onClick={handleAddCategory} className="submit-btn">Add</button>
+              <button type="button" onClick={() => setShowCategoryModal(false)} className="cancel-btn">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

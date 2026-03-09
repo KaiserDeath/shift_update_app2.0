@@ -3,7 +3,7 @@ from flask_cors import CORS
 import psycopg2
 import psycopg2.pool
 import bcrypt
-from datetime import datetime, timezone
+from datetime import datetime
 import uuid
 from urllib.parse import unquote
 import re
@@ -34,7 +34,6 @@ CORS(
 # =============================
 # DATABASE POOL CONFIG
 # =============================
-
 DATABASE_URL = os.environ["DATABASE_URL"]
 
 connection_pool = psycopg2.pool.SimpleConnectionPool(
@@ -52,7 +51,6 @@ def release_connection(conn):
 # =============================
 # VALIDATION
 # =============================
-
 def is_valid_name(name):
     if not name:
         return False
@@ -68,7 +66,6 @@ def is_valid_name(name):
 # =============================
 # ROLE PROTECTION (FIXED FOR CORS)
 # =============================
-
 def require_role(allowed_roles):
     def decorator(func):
         def wrapper(*args, **kwargs):
@@ -100,7 +97,6 @@ def require_role(allowed_roles):
 # =============================
 # INIT DATABASE
 # =============================
-
 def init_db():
     conn = get_connection()
     cursor = conn.cursor()
@@ -114,8 +110,6 @@ def init_db():
             information TEXT DEFAULT '{}'
         )
     """)
-
-    # --- AUTO-MIGRATION COMPANIES ---
     cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS group_name TEXT DEFAULT ''")
     cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS information TEXT DEFAULT '{}'")
 
@@ -125,6 +119,8 @@ def init_db():
             name TEXT UNIQUE NOT NULL
         )
     """)
+    # --- ADD PRIVATE COLUMN ---
+    cursor.execute("ALTER TABLE categories ADD COLUMN IF NOT EXISTS private BOOLEAN DEFAULT FALSE")
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS incidents (
@@ -140,8 +136,6 @@ def init_db():
             resolution TEXT DEFAULT ''
         )
     """)
-
-    # --- AUTO-MIGRATION INCIDENTS (NEW FIELD) ---
     cursor.execute("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS resolution TEXT DEFAULT ''")
 
     cursor.execute("""
@@ -170,7 +164,6 @@ init_db()
 # =============================
 # ADMIN CREATE USER
 # =============================
-
 @app.route("/admin/create-user", methods=["POST", "OPTIONS"])
 def create_user():
     if request.method == "OPTIONS": return "", 200
@@ -209,7 +202,6 @@ def create_user():
 # =============================
 # COMPANIES
 # =============================
-
 @app.route("/companies", methods=["GET"])
 def get_companies():
     conn = get_connection()
@@ -219,11 +211,7 @@ def get_companies():
     cursor.close()
     release_connection(conn)
     
-    return jsonify([{
-        "name": row[0],
-        "group_name": row[1],
-        "information": row[2]
-    } for row in rows])
+    return jsonify([{"name": row[0], "group_name": row[1], "information": row[2]} for row in rows])
 
 @app.route("/companies", methods=["POST", "OPTIONS"])
 @require_role(["admin", "supervisor"])
@@ -240,10 +228,7 @@ def add_company():
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute(
-            "INSERT INTO companies (name, group_name, information) VALUES (%s, %s, %s)",
-            (name, group, info)
-        )
+        cursor.execute("INSERT INTO companies (name, group_name, information) VALUES (%s, %s, %s)", (name, group, info))
         conn.commit()
     except psycopg2.errors.UniqueViolation:
         conn.rollback()
@@ -265,10 +250,7 @@ def update_company_info(name):
 
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE companies SET information = %s, group_name = %s WHERE name = %s",
-        (info, group, name)
-    )
+    cursor.execute("UPDATE companies SET information = %s, group_name = %s WHERE name = %s", (info, group, name))
     conn.commit()
     cursor.close()
     release_connection(conn)
@@ -295,16 +277,15 @@ def delete_company(name):
 # =============================
 # CATEGORIES
 # =============================
-
 @app.route("/categories", methods=["GET"])
 def get_categories():
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT name FROM categories ORDER BY name ASC")
+    cursor.execute("SELECT name, private FROM categories ORDER BY name ASC")
     rows = cursor.fetchall()
     cursor.close()
     release_connection(conn)
-    return jsonify([row[0] for row in rows])
+    return jsonify([{"name": row[0], "private": row[1]} for row in rows])
 
 @app.route("/categories", methods=["POST", "OPTIONS"])
 @require_role(["admin", "supervisor"])
@@ -312,12 +293,13 @@ def add_category():
     if request.method == "OPTIONS": return "", 200
     data = request.json
     name = (data.get("name") or "").strip()
+    private = data.get("private", False)
     if not is_valid_name(name):
         return jsonify({"error": "Invalid category name"}), 400
     conn = get_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("INSERT INTO categories (name) VALUES (%s)", (name,))
+        cursor.execute("INSERT INTO categories (name, private) VALUES (%s, %s)", (name, private))
         conn.commit()
     except psycopg2.errors.UniqueViolation:
         conn.rollback()
@@ -326,7 +308,7 @@ def add_category():
         return jsonify({"error": "Category already exists"}), 400
     cursor.close()
     release_connection(conn)
-    return jsonify({"message": "Category added"})
+    return jsonify({"message": "Category added", "category": {"name": name, "private": private}})
 
 @app.route("/categories/<path:name>", methods=["DELETE", "OPTIONS"])
 @require_role(["admin", "supervisor"])
@@ -349,7 +331,6 @@ def delete_category(name):
 # =============================
 # INCIDENTS
 # =============================
-
 @app.route("/incidents", methods=["GET"])
 def get_incidents():
     company = request.args.get("company")
@@ -360,12 +341,19 @@ def get_incidents():
     shift = request.args.get("shift")
     status = request.args.get("status")
     operator = request.args.get("operator")
-    
+    role = request.headers.get("Role")  # <-- NEW: get Role from frontend
+
     conn = get_connection()
     cursor = conn.cursor()
-    # Updated to include resolution in selection
+
+    # Fetch categories with privacy info
+    cursor.execute("SELECT name, private FROM categories")
+    categories = {name: private for name, private in cursor.fetchall()}
+
+    # Base query
     query = "SELECT id, timestamp, shift, category, company, description, action_taken, status, operator, resolution FROM incidents WHERE 1=1"
     params = []
+
     if company: query += " AND company = %s"; params.append(company)
     if category: query += " AND category = %s"; params.append(category)
     if shift: query += " AND shift = %s"; params.append(shift)
@@ -375,14 +363,30 @@ def get_incidents():
         query += " AND (description ILIKE %s OR action_taken ILIKE %s)"; params.append(f"%{search}%"); params.append(f"%{search}%")
     if date_from: query += " AND timestamp >= %s"; params.append(f"{date_from} 00:00:00")
     if date_to: query += " AND timestamp <= %s"; params.append(f"{date_to} 23:59:59")
-    
+
+    # Filter private categories for operators
+    if role == "operator":
+        private_cats = [name for name, private in categories.items() if private]
+        if private_cats:
+            placeholders = ",".join(["%s"]*len(private_cats))
+            query += f" AND category NOT IN ({placeholders})"
+            params.extend(private_cats)
+
     query += " ORDER BY timestamp DESC"
     cursor.execute(query, tuple(params))
     rows = cursor.fetchall()
     cursor.close()
     release_connection(conn)
-    return jsonify([{"id":r[0],"timestamp":r[1],"shift":r[2],"category":r[3],"company":r[4],"description":r[5],"action_taken":r[6],"status":r[7],"operator":r[8],"resolution":r[9]} for r in rows])
 
+    return jsonify([
+        {"id": r[0], "timestamp": r[1], "shift": r[2], "category": r[3], "company": r[4],
+         "description": r[5], "action_taken": r[6], "status": r[7], "operator": r[8], "resolution": r[9]}
+        for r in rows
+    ])
+
+# =============================
+# OTHER INCIDENT ROUTES
+# =============================
 @app.route("/incidents", methods=["POST", "OPTIONS"])
 def create_incident():
     if request.method == "OPTIONS": return "", 200
@@ -396,7 +400,8 @@ def create_incident():
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("INSERT INTO incidents (id, timestamp, shift, category, company, description, action_taken, status, operator, resolution) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-        (incident_id, timestamp, data.get("shift"), data.get("category"), data.get("company"), data.get("description"), data.get("action_taken"), data.get("status", "Pending"), data.get("operator"), ""))
+        (incident_id, timestamp, data.get("shift"), data.get("category"), data.get("company"), data.get("description"),
+         data.get("action_taken"), data.get("status", "Pending"), data.get("operator"), ""))
     conn.commit()
     cursor.close()
     release_connection(conn)
@@ -410,7 +415,8 @@ def update_incident(incident_id):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE incidents SET timestamp=%s, shift=%s, category=%s, company=%s, description=%s, action_taken=%s, status=%s, operator=%s WHERE id=%s",
-        (new_ts, data.get("shift"), data.get("category"), data.get("company"), data.get("description"), data.get("action_taken"), data.get("status"), data.get("operator"), incident_id))
+        (new_ts, data.get("shift"), data.get("category"), data.get("company"), data.get("description"),
+         data.get("action_taken"), data.get("status"), data.get("operator"), incident_id))
     conn.commit()
     cursor.close()
     release_connection(conn)
@@ -422,11 +428,9 @@ def update_status_only(incident_id):
     data = request.json
     status = data.get("status")
     resolution = data.get("resolution", "")
-    
     conn = get_connection()
     cursor = conn.cursor()
-    # Updated to save the resolution text
-    cursor.execute("UPDATE incidents SET status = %s, resolution = %s WHERE id = %s", (status, resolution, incident_id))
+    cursor.execute("UPDATE incidents SET status=%s, resolution=%s WHERE id=%s", (status, resolution, incident_id))
     conn.commit()
     cursor.close()
     release_connection(conn)
@@ -437,31 +441,27 @@ def delete_incident(incident_id):
     if request.method == "OPTIONS": return "", 200
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM incidents WHERE id = %s", (incident_id,))
+    cursor.execute("DELETE FROM incidents WHERE id=%s", (incident_id,))
     conn.commit()
     cursor.close()
     release_connection(conn)
     return jsonify({"message": "Incident deleted"})
 
 # =============================
-# LOGIN (FIXED FOR VERCEL)
+# LOGIN
 # =============================
-
 @app.route("/login", methods=["POST", "OPTIONS"])
 def login():
-    if request.method == "OPTIONS":
-        return "", 200
-        
+    if request.method == "OPTIONS": return "", 200
     data = request.json
     username = data.get("username")
     password = data.get("password")
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, password_hash, role FROM users WHERE username = %s", (username,))
+    cursor.execute("SELECT id, password_hash, role FROM users WHERE username=%s", (username,))
     user = cursor.fetchone()
     cursor.close()
     release_connection(conn)
-    
     if not user or not bcrypt.checkpw(password.encode(), user[1].encode()):
         return jsonify({"error": "Invalid credentials"}), 401
     return jsonify({"user_id": user[0], "username": username, "role": user[2]})
@@ -469,7 +469,6 @@ def login():
 # =============================
 # ADMIN USERS
 # =============================
-
 @app.route("/admin/users", methods=["GET"])
 @require_role(["admin"])
 def get_users():
@@ -491,7 +490,7 @@ def reset_user_password(username):
     pw_hash = bcrypt.hashpw(new_pass.encode(), bcrypt.gensalt()).decode()
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("UPDATE users SET password_hash = %s WHERE username = %s", (pw_hash, username))
+    cursor.execute("UPDATE users SET password_hash=%s WHERE username=%s", (pw_hash, username))
     conn.commit()
     cursor.close()
     release_connection(conn)
@@ -503,10 +502,11 @@ def update_user_role(username):
     if request.method == "OPTIONS": return "", 200
     data = request.json
     new_role = data.get("role")
-    if new_role not in ["admin", "supervisor", "operator"]: return jsonify({"error": "Invalid role"}), 400
+    if new_role not in ["admin", "supervisor", "operator"]:
+        return jsonify({"error": "Invalid role"}), 400
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("UPDATE users SET role = %s WHERE username = %s", (new_role, username))
+    cursor.execute("UPDATE users SET role=%s WHERE username=%s", (new_role, username))
     conn.commit()
     cursor.close()
     release_connection(conn)
@@ -518,7 +518,7 @@ def delete_user(username):
     if request.method == "OPTIONS": return "", 200
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM users WHERE username = %s", (username,))
+    cursor.execute("DELETE FROM users WHERE username=%s", (username,))
     conn.commit()
     cursor.close()
     release_connection(conn)

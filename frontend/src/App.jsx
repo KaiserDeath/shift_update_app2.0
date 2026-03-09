@@ -14,9 +14,9 @@ function App() {
   const [categories, setCategories] = useState([]);
   const [editingIncident, setEditingIncident] = useState(null);
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [activityLog, setActivityLog] = useState([]); 
+  const [activityLog, setActivityLog] = useState([]);
   const [isLogOpen, setIsLogOpen] = useState(false);
-  
+
   const [user, setUser] = useState(() => {
     const storedUser = localStorage.getItem("user");
     return storedUser ? JSON.parse(storedUser) : null;
@@ -39,22 +39,48 @@ function App() {
       const cleanFilters = Object.fromEntries(Object.entries(activeFilters).filter(([_, v]) => v));
       const query = new URLSearchParams(cleanFilters).toString();
       const headers = { Role: user.role, Username: user.username };
+
       const [incRes, compRes, catRes] = await Promise.all([
         fetch(`${API_URL}/incidents?${query}`, { headers }),
         fetch(`${API_URL}/companies`, { headers }),
         fetch(`${API_URL}/categories`, { headers })
       ]);
-      setIncidents(await incRes.json());
+
+      let rawIncidents = await incRes.json();
+      let rawCategories = await catRes.json();
+
+      // Normalize all categories into objects { name, private }
+      const normalizedCategories = rawCategories.map(c =>
+        typeof c === "string" ? { name: c, private: false } : { name: c.name, private: c.private ?? false }
+      );
+
+      if (user.role === "operator") {
+        // 1. Identify which categories are allowed (NOT private)
+        const allowedCategories = normalizedCategories.filter(c => !c.private);
+        const allowedNames = allowedCategories.map(c => c.name);
+
+        // 2. Filter incidents: Only show incidents whose category is in the allowed list
+        setIncidents(rawIncidents.filter(i => allowedNames.includes(i.category)));
+
+        // 3. Filter categories state: Operators will NEVER see private categories in dropdowns/filters
+        setCategories(allowedCategories);
+      } else {
+        // Admin/Supervisor see everything
+        setIncidents(rawIncidents);
+        setCategories(normalizedCategories);
+      }
+
       setCompanies(await compRes.json());
-      setCategories(await catRes.json());
-    } catch (error) { console.error("Error loading data:", error); }
+    } catch (error) {
+      console.error("Error loading data:", error);
+    }
   };
 
   const addLog = (action, incident) => {
     const newLog = {
       id: Date.now(),
       action,
-      title: incident.company + ": " + (incident.description?.substring(0, 30) || "No desc"),
+      title: (incident.company || "Unknown") + ": " + (incident.description?.substring(0, 30) || "No desc"),
       operator: user.username,
       time: new Date().toLocaleTimeString()
     };
@@ -77,29 +103,20 @@ function App() {
     } catch (error) { console.error(error); }
   };
 
-  /* =========================================
-     FIXED: Removed window.prompt notification
-     Now accepts resolutionText from IncidentRow
-     ========================================= */
   const updateStatus = async (id, newStatus, resolutionText = "") => {
-    // Logic: If status is Resolved, resolutionText will be provided by our custom modal.
-    // If it's empty but status is Resolved, we use a fallback to keep logic intact.
-    const finalResolution = newStatus === "Resolved" && !resolutionText 
-      ? "Resolved without specific notes." 
+    const finalResolution = newStatus === "Resolved" && !resolutionText
+      ? "Resolved without specific notes."
       : resolutionText;
 
     try {
       const response = await fetch(`${API_URL}/incidents/${id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Role: user.role, Username: user.username },
-        body: JSON.stringify({ 
-            status: newStatus, 
-            resolution: finalResolution 
-        }),
+        body: JSON.stringify({ status: newStatus, resolution: finalResolution }),
       });
 
       if (response.ok) {
-        setIncidents(prev => prev.map(i => i.id === id ? { ...i, status: newStatus, resolution: finalResolution } : i));
+        await loadData();
         const target = incidents.find(i => i.id === id);
         if (target) addLog(newStatus.toUpperCase(), target);
       }
@@ -120,17 +137,18 @@ function App() {
   };
 
   const updateIncident = async (updatedIncident) => {
-    const finalData = { ...updatedIncident, operator: user.username };
-    const res = await fetch(`${API_URL}/incidents/${updatedIncident.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", Role: user.role, Username: user.username },
-      body: JSON.stringify(finalData),
-    });
-    if (res.ok) {
-      addLog("EDITED", finalData);
-      await loadData();
-      setEditingIncident(null);
-    }
+    try {
+      const res = await fetch(`${API_URL}/incidents/${updatedIncident.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Role: user.role, Username: user.username },
+        body: JSON.stringify({ ...updatedIncident, operator: user.username }),
+      });
+      if (res.ok) {
+        addLog("EDITED", updatedIncident);
+        await loadData();
+        setEditingIncident(null);
+      }
+    } catch (error) { console.error(error); }
   };
 
   if (!user) return <Login onLogin={(data) => { setUser(data); localStorage.setItem("user", JSON.stringify(data)); }} />;
@@ -158,8 +176,41 @@ function App() {
         {activeTab === "dashboard" && (
           <div className="view-fade-in">
             <header className="content-header"><h2>Incident Management</h2></header>
-            <IncidentForm onAdd={addIncident} onUpdate={updateIncident} editingIncident={editingIncident} companies={companies} setCompanies={setCompanies} categories={categories} setCategories={setCategories} operator={user.username} role={user.role} API_URL={API_URL} />
-            
+
+            {editingIncident && (
+              <div className="modal-overlay">
+                <div className="modal-content glass-effect">
+                  <button className="close-modal" onClick={() => setEditingIncident(null)}>✕</button>
+                  <h3 style={{ marginBottom: '20px' }}>Edit Incident</h3>
+                  <IncidentForm
+                    onAdd={addIncident}
+                    onUpdate={updateIncident}
+                    editingIncident={editingIncident}
+                    companies={companies}
+                    categories={categories}
+                    setCategories={setCategories}
+                    operator={user.username}
+                    role={user.role}
+                    API_URL={API_URL}
+                  />
+                </div>
+              </div>
+            )}
+
+            {!editingIncident && (
+              <IncidentForm
+                onAdd={addIncident}
+                onUpdate={updateIncident}
+                editingIncident={null}
+                companies={companies}
+                categories={categories}
+                setCategories={setCategories}
+                operator={user.username}
+                role={user.role}
+                API_URL={API_URL}
+              />
+            )}
+
             <div className="filter-bar">
               <select value={filters.company} onChange={(e) => setFilters({ ...filters, company: e.target.value })}>
                 <option value="">All Companies</option>
@@ -167,7 +218,10 @@ function App() {
               </select>
               <select value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}>
                 <option value="">All Categories</option>
-                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                {/* Because we filtered 'categories' in loadData, 
+                   this will only show public options to Operators 
+                */}
+                {categories.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
               </select>
               <input type="text" placeholder="Search..." value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} />
               <input type="date" value={filters.date_from} onChange={(e) => setFilters({ ...filters, date_from: e.target.value })} />
@@ -179,7 +233,19 @@ function App() {
             <IncidentTable variant="resolved" incidents={incidents.filter(i => i.status === "Resolved")} onStatusChange={updateStatus} onDelete={deleteIncident} onEdit={setEditingIncident} />
           </div>
         )}
-        {activeTab === "hub" && <CompanyHub companies={companies} setCompanies={setCompanies} API_URL={API_URL} user={user} />}
+
+        {activeTab === "hub" && (
+          <CompanyHub
+            companies={companies}
+            setCompanies={setCompanies}
+            categories={categories}
+            setCategories={setCategories}
+            API_URL={API_URL}
+            user={user}
+            refreshData={loadData}
+          />
+        )}
+
         {activeTab === "analytics" && <Analytics incidents={incidents} />}
         {activeTab === "users" && user.role === "admin" && <div className="view-fade-in"><AdminPanel user={user} /></div>}
 
@@ -188,25 +254,18 @@ function App() {
         </button>
 
         <div className={`activity-drawer ${isLogOpen ? "open" : ""}`}>
-          <div className="drawer-header">
-            <h3>Recent Activity</h3>
-            <button className="close-drawer" onClick={() => setIsLogOpen(false)}>✕</button>
-          </div>
+          <div className="drawer-header"><h3>Recent Activity</h3><button className="close-drawer" onClick={() => setIsLogOpen(false)}>✕</button></div>
           <div className="drawer-body">
-            {activityLog.length === 0 ? (
-              <p className="empty-log">No history in this session.</p>
-            ) : (
-              activityLog.map((log) => (
-                <div key={log.id} className="log-entry">
-                  <div className="log-row">
-                    <span className={`log-action-tag ${log.action.toLowerCase()}`}>{log.action}</span>
-                    <span className="log-time">{log.time}</span>
-                  </div>
-                  <p className="log-desc">{log.title}</p>
-                  <small className="log-op">Operator: {log.operator}</small>
+            {activityLog.length === 0 ? <p className="empty-log">No history in this session.</p> : activityLog.map((log) => (
+              <div key={log.id} className="log-entry">
+                <div className="log-row">
+                  <span className={`log-action-tag ${log.action.toLowerCase()}`}>{log.action}</span>
+                  <span className="log-time">{log.time}</span>
                 </div>
-              ))
-            )}
+                <p className="log-desc">{log.title}</p>
+                <small className="log-op">Operator: {log.operator}</small>
+              </div>
+            ))}
           </div>
         </div>
         {isLogOpen && <div className="drawer-overlay" onClick={() => setIsLogOpen(false)}></div>}
@@ -214,4 +273,5 @@ function App() {
     </div>
   );
 }
+
 export default App;
