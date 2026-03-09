@@ -1,33 +1,43 @@
 /* =========================================
-   PREMIUM THEME VARIABLES
+   PREMIUM THEME VARIABLES (SOLID BLUE)
 ========================================= */
 :root {
-  --bg-gradient: linear-gradient(135deg, #eef2ff, #e0f2fe, #f1f5f9);
-  --glass-bg: rgba(255, 255, 255, 0.55);
-  --glass-strong: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.4);
 
+  /* BACKGROUND */
+  --bg-gradient: linear-gradient(135deg, #dbeafe, #eff6ff, #f8fafc);
+
+  /* PANELS */
+  --glass-bg: #ffffff;
+  --glass-strong: #f1f5f9;
+  --glass-border: #e2e8f0;
+
+  /* TEXT */
   --text: #0f172a;
   --muted: #64748b;
 
+  /* PRIMARY */
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
 
-  --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.08);
-  --shadow-strong: 0 20px 50px rgba(0, 0, 0, 0.15);
+  /* SHADOWS */
+  --shadow-soft: 0 6px 20px rgba(0,0,0,0.08);
+  --shadow-strong: 0 16px 40px rgba(0,0,0,0.12);
 
-  --status-open: #ef4444;
-  --status-progress: #f59e0b;
-  --status-closed: #22c55e;
-  --status-important: #dc2626;
+  /* STATUS COLORS */
+  --status-open: #dc2626;
+  --status-progress: #eab308;
+  --status-closed: #16a34a;
+  --status-important: #ea580c;
 }
 
 /* DARK MODE */
 body.dark {
-  --bg-gradient: linear-gradient(135deg, #0f172a, #1e293b, #0f172a);
-  --glass-bg: rgba(30, 41, 59, 0.55);
-  --glass-strong: rgba(30, 41, 59, 0.75);
-  --glass-border: rgba(255, 255, 255, 0.08);
+
+  --bg-gradient: linear-gradient(135deg, #020617, #0f172a, #020617);
+
+  --glass-bg: #1e293b;
+  --glass-strong: #334155;
+  --glass-border: #475569;
 
   --text: #e2e8f0;
   --muted: #94a3b8;
@@ -35,17 +45,17 @@ body.dark {
   --primary: #3b82f6;
   --primary-hover: #2563eb;
 
-  --shadow-soft: 0 10px 35px rgba(0, 0, 0, 0.4);
-  --shadow-strong: 0 25px 60px rgba(0, 0, 0, 0.6);
+  --shadow-soft: 0 10px 35px rgba(0,0,0,0.45);
+  --shadow-strong: 0 25px 60px rgba(0,0,0,0.65);
 
   --status-open: #f87171;
-  --status-progress: #fbbf24;
+  --status-progress: #fde047;
   --status-closed: #4ade80;
-  --status-important: #ef4444;
+  --status-important: #fb923c;
 }
 
 /* =========================================
-   GLOBAL RESET & DASHBOARD LAYOUT
+   GLOBAL RESET
 ========================================= */
 * {
   margin: 0;
@@ -60,7 +70,7 @@ body {
   animation: gradientMove 15s ease infinite;
   color: var(--text);
   min-height: 100vh;
-  overflow: hidden; /* Prevents double scrollbars */
+  overflow: hidden;
 }
 
 @keyframes gradientMove {
@@ -76,13 +86,11 @@ body {
 }
 
 /* =========================================
-   SIDEBAR STYLES
+   SIDEBAR
 ========================================= */
 .sidebar {
   width: 260px;
   background: var(--glass-strong);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border-right: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
@@ -115,9 +123,9 @@ body {
 .nav-links li {
   padding: 14px 18px;
   margin-bottom: 10px;
-  border-radius: 14px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.25s ease;
   font-weight: 500;
   color: var(--muted);
   display: flex;
@@ -126,14 +134,14 @@ body {
 }
 
 .nav-links li:hover {
-  background: rgba(37, 99, 235, 0.08);
+  background: #eff6ff;
   color: var(--primary);
 }
 
 .nav-links li.active {
   background: var(--primary);
   color: white;
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
 }
 
 .sidebar-footer {
@@ -145,17 +153,17 @@ body {
 }
 
 .logout-btn {
-  background: rgba(239, 68, 68, 0.1) !important;
-  color: #ef4444 !important;
+  background: #fee2e2 !important;
+  color: #dc2626 !important;
 }
 
 .logout-btn:hover {
-  background: #ef4444 !important;
+  background: #dc2626 !important;
   color: white !important;
 }
 
 /* =========================================
-   MAIN CONTENT AREA
+   MAIN CONTENT
 ========================================= */
 .main-content {
   flex-grow: 1;
@@ -169,22 +177,23 @@ body {
 }
 
 /* =========================================
-   GLASS PANELS (Forms, Cards, Tables)
+   PANELS
 ========================================= */
 form,
 .filter-bar,
 table,
 .glass-card {
   background: var(--glass-bg);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border-radius: 22px;
+  border-radius: 18px;
   border: 1px solid var(--glass-border);
   box-shadow: var(--shadow-soft);
-  transition: 0.3s ease;
+  transition: 0.25s ease;
 }
 
-form:hover, .filter-bar:hover, table:hover, .glass-card:hover {
+form:hover,
+.filter-bar:hover,
+table:hover,
+.glass-card:hover {
   box-shadow: var(--shadow-strong);
 }
 
@@ -205,7 +214,7 @@ form {
 }
 
 /* =========================================
-   ANALYTICS & CARDS
+   ANALYTICS
 ========================================= */
 .glass-card h1 {
   font-size: 2.5rem;
@@ -214,46 +223,51 @@ form {
 }
 
 .glass-card h3 {
-  font-size: 14px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--muted);
 }
 
 /* =========================================
-   INPUTS & BUTTONS
+   INPUTS
 ========================================= */
 input, select {
   padding: 11px 14px;
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid var(--glass-border);
-  background: var(--glass-strong);
+  background: white;
   color: var(--text);
   transition: 0.2s ease;
 }
 
-body.dark input, body.dark select {
-  background: rgba(255, 255, 255, 0.05);
+body.dark input,
+body.dark select {
+  background: #334155;
 }
 
+/* =========================================
+   BUTTONS
+========================================= */
 button {
   padding: 10px 20px;
-  border-radius: 14px;
+  border-radius: 12px;
   border: none;
   background: var(--primary);
   color: white;
   font-weight: 600;
   cursor: pointer;
-  transition: 0.25s ease;
+  transition: 0.2s ease;
 }
 
 button:hover {
+  background: var(--primary-hover);
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
 }
 
 /* =========================================
-   TABLE STYLES
+   TABLE
 ========================================= */
 table {
   width: 100%;
@@ -263,12 +277,12 @@ table {
 }
 
 thead {
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.9), rgba(29, 78, 216, 0.9));
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
   color: white;
 }
 
 th {
-  padding: 18px 15px;
+  padding: 16px 15px;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 1.5px;
@@ -276,40 +290,75 @@ th {
 }
 
 td {
-  padding: 16px 15px;
+  padding: 15px;
   font-size: 14px;
   border-bottom: 1px solid var(--glass-border);
 }
 
-tr:hover td { background: rgba(255, 255, 255, 0.05); }
+tr:hover td {
+  background: #f1f5f9;
+}
 
-/* Status Badges */
-.status-open, .status-progress, .status-closed, .status-important {
+/* =========================================
+   STATUS BADGES
+========================================= */
+
+.status-open {
+  background: #fee2e2;
+  color: #dc2626;
   padding: 5px 12px;
   border-radius: 20px;
   font-weight: 700;
   font-size: 11px;
 }
 
-.status-open { background: rgba(239, 68, 68, 0.15); color: var(--status-open); }
-.status-progress { background: rgba(245, 158, 11, 0.15); color: var(--status-progress); }
-.status-closed { background: rgba(34, 197, 94, 0.15); color: var(--status-closed); }
-.status-important { 
-    background: rgba(220, 38, 38, 0.2); 
-    color: var(--status-important); 
-    box-shadow: 0 0 10px rgba(220, 38, 38, 0.3);
+.status-progress {
+  background: #fef9c3;
+  color: #ca8a04;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.status-closed {
+  background: #dcfce7;
+  color: #15803d;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.status-important {
+  background: #ffedd5;
+  color: #c2410c;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 11px;
 }
 
 /* =========================================
    TABLE VARIANTS
 ========================================= */
-.incident-table.important thead { background: linear-gradient(135deg, #dc2626, #991b1b); }
-.incident-table.pending thead { background: linear-gradient(135deg, #f59e0b, #b45309); }
-.incident-table.resolved thead { background: linear-gradient(135deg, #10b981, #065f46); }
+
+.incident-table.important thead {
+  background: linear-gradient(135deg, #fb923c, #ea580c);
+}
+
+.incident-table.pending thead {
+  background: linear-gradient(135deg, #facc15, #f59e0b);
+}
+
+.incident-table.resolved thead {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
 
 /* =========================================
    ANIMATIONS
 ========================================= */
+
 .view-fade-in {
   animation: fadeIn 0.4s ease-out;
 }
@@ -322,8 +371,22 @@ tr:hover td { background: rgba(255, 255, 255, 0.05); }
 /* =========================================
    RESPONSIVE
 ========================================= */
+
 @media (max-width: 1024px) {
-  .sidebar { width: 80px; padding: 20px 10px; }
-  .sidebar-header h2, .sidebar-header p, .nav-links span { display: none; }
-  .nav-links li { justify-content: center; padding: 15px; }
+
+  .sidebar {
+    width: 80px;
+    padding: 20px 10px;
+  }
+
+  .sidebar-header h2,
+  .sidebar-header p,
+  .nav-links span {
+    display: none;
+  }
+
+  .nav-links li {
+    justify-content: center;
+    padding: 15px;
+  }
 }

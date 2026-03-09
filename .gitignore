@@ -36,3 +36,5 @@ Thumbs.db
 # (Only if you don't want them in Git)
 # ===============================
 # backend/incidents_sqlite_backup.db
+.vercel
+.env*.local

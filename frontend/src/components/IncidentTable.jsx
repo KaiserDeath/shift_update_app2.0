@@ -1,6 +1,5 @@
 import React from "react";
 import IncidentRow from "./IncidentRow";
-import { formatTimestamp } from "../utils/time";
 
 function IncidentTable({ 
   incidents, 
@@ -10,13 +9,19 @@ function IncidentTable({
   variant 
 }) {
 
+  // Merged title logic to include the 'important' case
+  const getTableTitle = () => {
+    switch (variant) {
+      case "important": return "Important Incidents";
+      case "pending": return "Pending Incidents";
+      case "resolved": return "Resolved Incidents";
+      default: return "All Incidents";
+    }
+  };
+
   return (
-    <div>
-      <h3>
-        {variant === "pending" && "Pending Incidents"}
-        {variant === "resolved" && "Resolved Incidents"}
-        {!variant && "All Incidents"}
-      </h3>
+    <div className="incident-table-container">
+      <h3>{getTableTitle()}</h3>
 
       <table 
         className={`incident-table ${variant || ""}`}
@@ -34,8 +39,8 @@ function IncidentTable({
             <th>Description</th>
             <th>Action Taken</th>
             <th>Status</th>
-            <th>Edit</th>
-            <th>Delete</th>
+            {/* Merged Edit/Delete into a single Actions header */}
+            <th style={{ textAlign: "center" }}>Actions</th>
           </tr>
         </thead>
 
