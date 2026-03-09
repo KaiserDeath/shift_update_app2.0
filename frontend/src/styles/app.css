@@ -2,7 +2,6 @@
    PREMIUM THEME VARIABLES (SOLID BLUE)
 ========================================= */
 :root {
-
   /* BACKGROUND */
   --bg-gradient: linear-gradient(135deg, #dbeafe, #eff6ff, #f8fafc);
 
@@ -32,7 +31,6 @@
 
 /* DARK MODE */
 body.dark {
-
   --bg-gradient: linear-gradient(135deg, #020617, #0f172a, #020617);
 
   --glass-bg: #1e293b;
@@ -134,7 +132,7 @@ body {
 }
 
 .nav-links li:hover {
-  background: #eff6ff;
+  background: rgba(37, 99, 235, 0.1);
   color: var(--primary);
 }
 
@@ -214,41 +212,17 @@ form {
 }
 
 /* =========================================
-   ANALYTICS
-========================================= */
-.glass-card h1 {
-  font-size: 2.5rem;
-  margin: 10px 0;
-  font-weight: 700;
-}
-
-.glass-card h3 {
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--muted);
-}
-
-/* =========================================
-   INPUTS
+   INPUTS & BUTTONS
 ========================================= */
 input, select {
   padding: 11px 14px;
   border-radius: 12px;
   border: 1px solid var(--glass-border);
-  background: white;
+  background: var(--glass-bg);
   color: var(--text);
   transition: 0.2s ease;
 }
 
-body.dark input,
-body.dark select {
-  background: #334155;
-}
-
-/* =========================================
-   BUTTONS
-========================================= */
 button {
   padding: 10px 20px;
   border-radius: 12px;
@@ -296,69 +270,120 @@ td {
 }
 
 tr:hover td {
-  background: #f1f5f9;
+  background: var(--glass-strong);
+}
+
+/* TABLE VARIANTS */
+.incident-table.important thead { background: linear-gradient(135deg, #fb923c, #ea580c); }
+.incident-table.pending thead { background: linear-gradient(135deg, #facc15, #f59e0b); }
+.incident-table.resolved thead { background: linear-gradient(135deg, #22c55e, #16a34a); }
+
+/* =========================================
+   ACTIVITY DRAWER & FLOATING BTN
+========================================= */
+.log-floating-btn {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  background: var(--primary);
+  color: white;
+  padding: 14px 24px;
+  border-radius: 50px;
+  box-shadow: var(--shadow-strong);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.log-count {
+  background: white;
+  color: var(--primary);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+
+.activity-drawer {
+  position: fixed;
+  top: 0;
+  right: -420px; /* Hidden */
+  width: 400px;
+  height: 100vh;
+  background: var(--glass-bg);
+  border-left: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-strong);
+  transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+}
+
+.activity-drawer.open {
+  right: 0; /* Visible */
+}
+
+.drawer-header {
+  padding: 25px;
+  border-bottom: 1px solid var(--glass-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.close-drawer {
+  background: none !important;
+  color: var(--muted) !important;
+  box-shadow: none !important;
+  font-size: 22px;
+  transform: none !important;
+}
+
+.drawer-body {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.log-entry {
+  padding: 15px;
+  background: var(--glass-strong);
+  border-radius: 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--glass-border);
+}
+
+.log-action-tag {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+}
+
+.log-action-tag.deleted { background: #fee2e2; color: #dc2626; }
+.log-action-tag.edited { background: #dcfce7; color: #16a34a; }
+
+.log-time { font-size: 11px; color: var(--muted); }
+.log-desc { font-size: 13px; font-weight: 600; margin: 8px 0; color: var(--text); }
+.log-op { font-size: 11px; color: var(--muted); }
+
+.drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 1999;
 }
 
 /* =========================================
-   STATUS BADGES
+   ANIMATIONS & RESPONSIVE
 ========================================= */
-
-.status-open {
-  background: #fee2e2;
-  color: #dc2626;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-weight: 700;
-  font-size: 11px;
-}
-
-.status-progress {
-  background: #fef9c3;
-  color: #ca8a04;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-weight: 700;
-  font-size: 11px;
-}
-
-.status-closed {
-  background: #dcfce7;
-  color: #15803d;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-weight: 700;
-  font-size: 11px;
-}
-
-.status-important {
-  background: #ffedd5;
-  color: #c2410c;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-weight: 700;
-  font-size: 11px;
-}
-
-/* =========================================
-   TABLE VARIANTS
-========================================= */
-
-.incident-table.important thead {
-  background: linear-gradient(135deg, #fb923c, #ea580c);
-}
-
-.incident-table.pending thead {
-  background: linear-gradient(135deg, #facc15, #f59e0b);
-}
-
-.incident-table.resolved thead {
-  background: linear-gradient(135deg, #22c55e, #16a34a);
-}
-
-/* =========================================
-   ANIMATIONS
-========================================= */
-
 .view-fade-in {
   animation: fadeIn 0.4s ease-out;
 }
@@ -368,25 +393,9 @@ tr:hover td {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* =========================================
-   RESPONSIVE
-========================================= */
-
 @media (max-width: 1024px) {
-
-  .sidebar {
-    width: 80px;
-    padding: 20px 10px;
-  }
-
-  .sidebar-header h2,
-  .sidebar-header p,
-  .nav-links span {
-    display: none;
-  }
-
-  .nav-links li {
-    justify-content: center;
-    padding: 15px;
-  }
+  .sidebar { width: 80px; padding: 20px 10px; }
+  .sidebar-header h2, .sidebar-header p, .nav-links span { display: none; }
+  .nav-links li { justify-content: center; }
+  .activity-drawer { width: 100%; right: -100%; }
 }

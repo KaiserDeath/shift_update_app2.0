@@ -14,7 +14,9 @@ function App() {
   const [categories, setCategories] = useState([]);
   const [editingIncident, setEditingIncident] = useState(null);
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [activityLog, setActivityLog] = useState([]); // ✅ New: Activity Log State
+  const [activityLog, setActivityLog] = useState([]); 
+  const [isLogOpen, setIsLogOpen] = useState(false); // ✅ Logic for Drawer State
+  
   const [user, setUser] = useState(() => {
     const storedUser = localStorage.getItem("user");
     return storedUser ? JSON.parse(storedUser) : null;
@@ -48,12 +50,11 @@ function App() {
     } catch (error) { console.error("Error loading data:", error); }
   };
 
-  // ✅ LOGGING HELPER
   const addLog = (action, incident) => {
     const newLog = {
       id: Date.now(),
       action,
-      title: incident.company + ": " + (incident.description?.substring(0, 20) || "No desc"),
+      title: incident.company + ": " + (incident.description?.substring(0, 30) || "No desc"),
       operator: user.username,
       time: new Date().toLocaleTimeString()
     };
@@ -94,13 +95,12 @@ function App() {
       headers: { Role: user.role, Username: user.username },
     });
     if (res.ok) {
-      addLog("DELETED", target); // ✅ Log deletion
+      addLog("DELETED", target);
       setIncidents(prev => prev.filter(i => i.id !== id));
     }
   };
 
   const updateIncident = async (updatedIncident) => {
-    // ✅ Automatically update operator to the current user on edit
     const finalData = { ...updatedIncident, operator: user.username };
     const res = await fetch(`${API_URL}/incidents/${updatedIncident.id}`, {
       method: "PUT",
@@ -108,7 +108,7 @@ function App() {
       body: JSON.stringify(finalData),
     });
     if (res.ok) {
-      addLog("EDITED", finalData); // ✅ Log edit
+      addLog("EDITED", finalData);
       await loadData();
       setEditingIncident(null);
     }
@@ -155,27 +155,44 @@ function App() {
               <input type="date" value={filters.date_to} onChange={(e) => setFilters({ ...filters, date_to: e.target.value })} />
             </div>
 
-            {/* ✅ Using unified IncidentTable for all sections */}
             <IncidentTable variant="important" incidents={incidents.filter(i => i.status === "Important")} onStatusChange={updateStatus} onDelete={deleteIncident} onEdit={setEditingIncident} />
             <IncidentTable variant="pending" incidents={incidents.filter(i => i.status === "Pending")} onStatusChange={updateStatus} onDelete={deleteIncident} onEdit={setEditingIncident} />
             <IncidentTable variant="resolved" incidents={incidents.filter(i => i.status === "Resolved")} onStatusChange={updateStatus} onDelete={deleteIncident} onEdit={setEditingIncident} />
-
-            {/* ✅ Activity Log Footer UI */}
-            <div className="activity-log-box glass-card" style={{ marginTop: '30px', padding: '15px', borderRadius: '8px' }}>
-                <h4 style={{ marginBottom: '10px' }}>📜 Recent Actions Log</h4>
-                <div style={{ maxHeight: '150px', overflowY: 'auto', fontSize: '13px' }}>
-                    {activityLog.length === 0 ? <p style={{opacity: 0.5}}>No recent changes.</p> : activityLog.map(log => (
-                        <div key={log.id} style={{ padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                            <span style={{ color: log.action === 'DELETED' ? '#ff4d4d' : '#4caf50', fontWeight: 'bold' }}>[{log.action}]</span> {log.title} — <i>{log.operator} at {log.time}</i>
-                        </div>
-                    ))}
-                </div>
-            </div>
           </div>
         )}
         {activeTab === "hub" && <CompanyHub companies={companies} setCompanies={setCompanies} API_URL={API_URL} user={user} />}
         {activeTab === "analytics" && <Analytics incidents={incidents} />}
         {activeTab === "users" && user.role === "admin" && <div className="view-fade-in"><AdminPanel user={user} /></div>}
+
+        {/* ✅ Activity Toggle Button */}
+        <button className="log-floating-btn" onClick={() => setIsLogOpen(true)}>
+          📜 Activity {activityLog.length > 0 && <span className="log-count">{activityLog.length}</span>}
+        </button>
+
+        {/* ✅ Slide-out Activity Drawer */}
+        <div className={`activity-drawer ${isLogOpen ? "open" : ""}`}>
+          <div className="drawer-header">
+            <h3>Recent Activity</h3>
+            <button className="close-drawer" onClick={() => setIsLogOpen(false)}>✕</button>
+          </div>
+          <div className="drawer-body">
+            {activityLog.length === 0 ? (
+              <p className="empty-log">No history in this session.</p>
+            ) : (
+              activityLog.map((log) => (
+                <div key={log.id} className="log-entry">
+                  <div className="log-row">
+                    <span className={`log-action-tag ${log.action.toLowerCase()}`}>{log.action}</span>
+                    <span className="log-time">{log.time}</span>
+                  </div>
+                  <p className="log-desc">{log.title}</p>
+                  <small className="log-op">Operator: {log.operator}</small>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+        {isLogOpen && <div className="drawer-overlay" onClick={() => setIsLogOpen(false)}></div>}
       </main>
     </div>
   );

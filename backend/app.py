@@ -14,15 +14,21 @@ load_dotenv()
 
 app = Flask(__name__)
 
+# =============================
+# ENHANCED CORS CONFIGURATION
+# =============================
 CORS(
     app,
-    origins=[
-        "https://shiftupdateapp20-production.up.railway.app",
-        "https://shift-update-app2-0.vercel.app",
-        "http://localhost:5173"
-    ],
-    allow_headers=["Content-Type", "Username", "Role"],
-    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    resources={r"/*": {
+        "origins": [
+            "https://shift-update-app2-0.vercel.app",
+            "https://shiftupdateapp20-production.up.railway.app",
+            "http://localhost:5173"
+        ],
+        "allow_headers": ["Content-Type", "Username", "Role", "Authorization"],
+        "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        "supports_credentials": True
+    }}
 )
 
 # =============================
@@ -60,25 +66,30 @@ def is_valid_name(name):
     return True
 
 # =============================
-# ROLE PROTECTION
+# ROLE PROTECTION (FIXED FOR CORS)
 # =============================
 
 def require_role(allowed_roles):
     def decorator(func):
         def wrapper(*args, **kwargs):
+            # FIXED: Allow preflight OPTIONS requests to pass through without header checks
             if request.method == "OPTIONS":
                 return "", 200
+            
             username = request.headers.get("Username")
             if not username:
                 return jsonify({"error": "Username required"}), 403
+            
             conn = get_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT role FROM users WHERE username = %s", (username,))
             result = cursor.fetchone()
             cursor.close()
             release_connection(conn)
+            
             if not result:
                 return jsonify({"error": "User not found"}), 403
+            
             user_role = result[0]
             if user_role not in allowed_roles:
                 return jsonify({"error": "Unauthorized"}), 403
@@ -105,7 +116,7 @@ def init_db():
         )
     """)
 
-    # --- AUTO-MIGRATION (Adds columns if they don't exist in existing DB) ---
+    # --- AUTO-MIGRATION ---
     cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS group_name TEXT DEFAULT ''")
     cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS information TEXT DEFAULT '{}'")
 
@@ -157,15 +168,18 @@ init_db()
 # ADMIN CREATE USER
 # =============================
 
-@app.route("/admin/create-user", methods=["POST"])
+@app.route("/admin/create-user", methods=["POST", "OPTIONS"])
 def create_user():
+    if request.method == "OPTIONS": return "", 200
     data = request.json
     admin_username = data.get("admin_username")
     username = data.get("username")
     password = data.get("password")
     role = data.get("role")
+    
     if not all([admin_username, username, password, role]):
         return jsonify({"error": "All fields required"}), 400
+        
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT role FROM users WHERE username = %s", (admin_username,))
@@ -174,6 +188,7 @@ def create_user():
         cursor.close()
         release_connection(conn)
         return jsonify({"error": "Only admin can create users"}), 403
+        
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     try:
         cursor.execute("INSERT INTO users (username, password_hash, role) VALUES (%s, %s, %s)", (username, password_hash, role))
@@ -183,19 +198,19 @@ def create_user():
         cursor.close()
         release_connection(conn)
         return jsonify({"error": "Username already exists"}), 400
+        
     cursor.close()
     release_connection(conn)
     return jsonify({"message": "User created"})
 
 # =============================
-# COMPANIES (Updated for Hub)
+# COMPANIES
 # =============================
 
 @app.route("/companies", methods=["GET"])
 def get_companies():
     conn = get_connection()
     cursor = conn.cursor()
-    # Now fetching all details for the Hub
     cursor.execute("SELECT name, group_name, information FROM companies ORDER BY name ASC")
     rows = cursor.fetchall()
     cursor.close()
@@ -207,9 +222,10 @@ def get_companies():
         "information": row[2]
     } for row in rows])
 
-@app.route("/companies", methods=["POST"])
+@app.route("/companies", methods=["POST", "OPTIONS"])
 @require_role(["admin", "supervisor"])
 def add_company():
+    if request.method == "OPTIONS": return "", 200
     data = request.json
     name = (data.get("name") or "").strip()
     group = (data.get("group_name") or "").strip()
@@ -235,9 +251,10 @@ def add_company():
     release_connection(conn)
     return jsonify({"message": "Company added", "name": name})
 
-@app.route("/companies/<path:name>/info", methods=["PATCH"])
+@app.route("/companies/<path:name>/info", methods=["PATCH", "OPTIONS"])
 @require_role(["admin", "supervisor"])
 def update_company_info(name):
+    if request.method == "OPTIONS": return "", 200
     name = unquote(name).strip()
     data = request.json
     info = data.get("information", "{}")
@@ -254,9 +271,10 @@ def update_company_info(name):
     release_connection(conn)
     return jsonify({"message": "Info updated"})
 
-@app.route("/companies/<path:name>", methods=["DELETE"])
+@app.route("/companies/<path:name>", methods=["DELETE", "OPTIONS"])
 @require_role(["admin", "supervisor"])
 def delete_company(name):
+    if request.method == "OPTIONS": return "", 200
     name = unquote(name).strip()
     conn = get_connection()
     cursor = conn.cursor()
@@ -285,9 +303,10 @@ def get_categories():
     release_connection(conn)
     return jsonify([row[0] for row in rows])
 
-@app.route("/categories", methods=["POST"])
+@app.route("/categories", methods=["POST", "OPTIONS"])
 @require_role(["admin", "supervisor"])
 def add_category():
+    if request.method == "OPTIONS": return "", 200
     data = request.json
     name = (data.get("name") or "").strip()
     if not is_valid_name(name):
@@ -306,9 +325,10 @@ def add_category():
     release_connection(conn)
     return jsonify({"message": "Category added"})
 
-@app.route("/categories/<path:name>", methods=["DELETE"])
+@app.route("/categories/<path:name>", methods=["DELETE", "OPTIONS"])
 @require_role(["admin", "supervisor"])
 def delete_category(name):
+    if request.method == "OPTIONS": return "", 200
     name = unquote(name).strip()
     conn = get_connection()
     cursor = conn.cursor()
@@ -337,26 +357,21 @@ def get_incidents():
     shift = request.args.get("shift")
     status = request.args.get("status")
     operator = request.args.get("operator")
+    
     conn = get_connection()
     cursor = conn.cursor()
     query = "SELECT id, timestamp, shift, category, company, description, action_taken, status, operator FROM incidents WHERE 1=1"
     params = []
-    if company:
-        query += " AND company = %s"; params.append(company)
-    if category:
-        query += " AND category = %s"; params.append(category)
-    if shift:
-        query += " AND shift = %s"; params.append(shift)
-    if status:
-        query += " AND status = %s"; params.append(status)
-    if operator:
-        query += " AND operator = %s"; params.append(operator)
+    if company: query += " AND company = %s"; params.append(company)
+    if category: query += " AND category = %s"; params.append(category)
+    if shift: query += " AND shift = %s"; params.append(shift)
+    if status: query += " AND status = %s"; params.append(status)
+    if operator: query += " AND operator = %s"; params.append(operator)
     if search:
         query += " AND (description ILIKE %s OR action_taken ILIKE %s)"; params.append(f"%{search}%"); params.append(f"%{search}%")
-    if date_from:
-        query += " AND timestamp >= %s"; params.append(f"{date_from} 00:00:00")
-    if date_to:
-        query += " AND timestamp <= %s"; params.append(f"{date_to} 23:59:59")
+    if date_from: query += " AND timestamp >= %s"; params.append(f"{date_from} 00:00:00")
+    if date_to: query += " AND timestamp <= %s"; params.append(f"{date_to} 23:59:59")
+    
     query += " ORDER BY timestamp DESC"
     cursor.execute(query, tuple(params))
     rows = cursor.fetchall()
@@ -364,12 +379,14 @@ def get_incidents():
     release_connection(conn)
     return jsonify([{"id":r[0],"timestamp":r[1],"shift":r[2],"category":r[3],"company":r[4],"description":r[5],"action_taken":r[6],"status":r[7],"operator":r[8]} for r in rows])
 
-@app.route("/incidents", methods=["POST"])
+@app.route("/incidents", methods=["POST", "OPTIONS"])
 def create_incident():
+    if request.method == "OPTIONS": return "", 200
     data = request.json
     required = ["shift", "category", "company", "description", "operator"]
     for f in required:
         if not data.get(f): return jsonify({"error": f"{f} is required"}), 400
+        
     incident_id = str(uuid.uuid4())
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_connection()
@@ -381,8 +398,9 @@ def create_incident():
     release_connection(conn)
     return jsonify({"id": incident_id, "timestamp": timestamp, **data})
 
-@app.route("/incidents/<incident_id>", methods=["PUT"])
+@app.route("/incidents/<incident_id>", methods=["PUT", "OPTIONS"])
 def update_incident(incident_id):
+    if request.method == "OPTIONS": return "", 200
     data = request.json
     new_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_connection()
@@ -394,8 +412,9 @@ def update_incident(incident_id):
     release_connection(conn)
     return jsonify({"message": "Incident updated"})
 
-@app.route("/incidents/<incident_id>/status", methods=["PATCH"])
+@app.route("/incidents/<incident_id>/status", methods=["PATCH", "OPTIONS"])
 def update_status_only(incident_id):
+    if request.method == "OPTIONS": return "", 200
     data = request.json
     conn = get_connection()
     cursor = conn.cursor()
@@ -405,8 +424,9 @@ def update_status_only(incident_id):
     release_connection(conn)
     return jsonify({"message": "Status updated"})
 
-@app.route("/incidents/<incident_id>", methods=["DELETE"])
+@app.route("/incidents/<incident_id>", methods=["DELETE", "OPTIONS"])
 def delete_incident(incident_id):
+    if request.method == "OPTIONS": return "", 200
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM incidents WHERE id = %s", (incident_id,))
@@ -416,11 +436,14 @@ def delete_incident(incident_id):
     return jsonify({"message": "Incident deleted"})
 
 # =============================
-# LOGIN
+# LOGIN (FIXED FOR VERCEL)
 # =============================
 
-@app.route("/login", methods=["POST"])
+@app.route("/login", methods=["POST", "OPTIONS"])
 def login():
+    if request.method == "OPTIONS":
+        return "", 200
+        
     data = request.json
     username = data.get("username")
     password = data.get("password")
@@ -430,6 +453,7 @@ def login():
     user = cursor.fetchone()
     cursor.close()
     release_connection(conn)
+    
     if not user or not bcrypt.checkpw(password.encode(), user[1].encode()):
         return jsonify({"error": "Invalid credentials"}), 401
     return jsonify({"user_id": user[0], "username": username, "role": user[2]})
@@ -449,9 +473,10 @@ def get_users():
     release_connection(conn)
     return jsonify([{"username": r[0], "role": r[1]} for r in rows])
 
-@app.route("/admin/users/<username>/password", methods=["PATCH"])
+@app.route("/admin/users/<username>/password", methods=["PATCH", "OPTIONS"])
 @require_role(["admin"])
 def reset_user_password(username):
+    if request.method == "OPTIONS": return "", 200
     data = request.json
     new_pass = data.get("password")
     if not new_pass: return jsonify({"error": "Password is required"}), 400
@@ -464,9 +489,10 @@ def reset_user_password(username):
     release_connection(conn)
     return jsonify({"message": "Password updated"})
 
-@app.route("/admin/users/<username>/role", methods=["PATCH"])
+@app.route("/admin/users/<username>/role", methods=["PATCH", "OPTIONS"])
 @require_role(["admin"])
 def update_user_role(username):
+    if request.method == "OPTIONS": return "", 200
     data = request.json
     new_role = data.get("role")
     if new_role not in ["admin", "supervisor", "operator"]: return jsonify({"error": "Invalid role"}), 400
@@ -478,9 +504,10 @@ def update_user_role(username):
     release_connection(conn)
     return jsonify({"message": "Role updated"})
 
-@app.route("/admin/users/<username>", methods=["DELETE"])
+@app.route("/admin/users/<username>", methods=["DELETE", "OPTIONS"])
 @require_role(["admin"])
 def delete_user(username):
+    if request.method == "OPTIONS": return "", 200
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM users WHERE username = %s", (username,))
