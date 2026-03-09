@@ -1,11 +1,26 @@
-import React from "react";
+import React, { useState } from "react";
 import { formatTimestamp } from "../utils/time";
 
-function IncidentRow({ incident, onStatusChange, onDelete, onEdit }) {
+function IncidentRow({ incident, onStatusChange, onDelete, onEdit, isResolvedView }) {
+  const [showResInput, setShowResInput] = useState(false);
+  const [resText, setResText] = useState("");
+  const [showInfo, setShowInfo] = useState(false);
 
-  // Logic Preserved: Handles status updates via the parent function
-  const handleChange = (e) => {
-    onStatusChange(incident.id, e.target.value);
+  const handleStatusChange = (e) => {
+    const val = e.target.value;
+    if (val === "Resolved") {
+      setShowResInput(true); // Open the centered window
+    } else {
+      onStatusChange(incident.id, val);
+    }
+  };
+
+  const handleConfirm = () => {
+    if (resText.trim()) {
+      onStatusChange(incident.id, "Resolved", resText);
+      setShowResInput(false);
+      setResText("");
+    }
   };
 
   return (
@@ -19,51 +34,56 @@ function IncidentRow({ incident, onStatusChange, onDelete, onEdit }) {
       <td>{incident.action_taken || "N/A"}</td>
 
       <td>
-        <select
-          value={incident.status}
-          onChange={handleChange}
-          className={`status-select ${incident.status.toLowerCase()}`}
-        >
+        <select value={incident.status} onChange={handleStatusChange} className={`status-select ${incident.status.toLowerCase()}`}>
           <option value="Pending">Pending</option>
           <option value="Important">Important</option>
           <option value="Resolved">Resolved</option>
         </select>
       </td>
 
-      {/* Logic Preserved & Merged: Edit and Delete buttons now use icons in one cell */}
-      <td style={{ textAlign: "center" }}>
-        <div style={{ display: "flex", gap: "12px", justifyContent: "center", alignItems: "center" }}>
-          {/* ✏ Edit Icon-Button */}
-          <button
-            onClick={() => onEdit(incident)}
-            style={{ 
-              background: "none", 
-              border: "none", 
-              cursor: "pointer", 
-              fontSize: "16px",
-              padding: "4px" 
-            }}
-            title="Edit Incident"
-          >
-            ✏️
-          </button>
+      {/* VIEW RESOLUTION ICON */}
+      {isResolvedView && (
+        <td style={{ textAlign: "center", position: "relative" }}>
+          <button onClick={() => setShowInfo(!showInfo)} className="res-info-btn">ℹ️</button>
+          {showInfo && (
+            <div className="resolution-popover info-view">
+              <div className="popover-header"><span>Resolution Details</span></div>
+              <div className="popover-body">{incident.resolution}</div>
+              <div className="popover-arrow"></div>
+            </div>
+          )}
+        </td>
+      )}
 
-          {/* 🗑 Delete Icon-Button (Previously 'X') */}
-          <button
-            onClick={() => onDelete(incident.id)}
-            style={{ 
-              background: "none", 
-              border: "none", 
-              cursor: "pointer", 
-              fontSize: "16px",
-              padding: "4px"
-            }}
-            title="Delete Incident"
-          >
-            🗑️
-          </button>
+      {/* ACTIONS */}
+      <td style={{ textAlign: "center" }}>
+        <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+          <button onClick={() => onEdit(incident)} className="action-icon-btn">✏️</button>
+          <button onClick={() => onDelete(incident.id)} className="action-icon-btn">🗑️</button>
         </div>
       </td>
+
+      {/* THE CENTERED RESOLUTION MODAL (Grows from center) */}
+      {showResInput && (
+        <div className="modal-overlay">
+          <div className="hub-modal-window">
+            <div className="modal-header">
+              <h3>Finalize Resolution</h3>
+              <button onClick={() => setShowResInput(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p>Enter the final steps taken to resolve this incident:</p>
+              <textarea 
+                autoFocus 
+                value={resText} 
+                onChange={(e) => setResText(e.target.value)}
+                placeholder="Ex: Refunding the user, reset terminal..."
+              />
+              <button className="confirm-btn" onClick={handleConfirm}>Confirm & Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </tr>
   );
 }

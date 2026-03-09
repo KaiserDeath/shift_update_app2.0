@@ -9,7 +9,6 @@ function IncidentTable({
   variant 
 }) {
 
-  // Merged title logic to include the 'important' case
   const getTableTitle = () => {
     switch (variant) {
       case "important": return "Important Incidents";
@@ -39,7 +38,8 @@ function IncidentTable({
             <th>Description</th>
             <th>Action Taken</th>
             <th>Status</th>
-            {/* Merged Edit/Delete into a single Actions header */}
+            {/* ✅ NEW: Add Resolution Column Header only for Resolved table */}
+            {variant === "resolved" && <th>Resolution Info</th>}
             <th style={{ textAlign: "center" }}>Actions</th>
           </tr>
         </thead>
@@ -52,6 +52,7 @@ function IncidentTable({
               onStatusChange={onStatusChange}
               onDelete={onDelete}
               onEdit={onEdit}
+              isResolvedView={variant === "resolved"} // Pass this prop down
             />
           ))}
         </tbody>

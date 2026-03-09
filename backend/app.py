@@ -72,7 +72,6 @@ def is_valid_name(name):
 def require_role(allowed_roles):
     def decorator(func):
         def wrapper(*args, **kwargs):
-            # FIXED: Allow preflight OPTIONS requests to pass through without header checks
             if request.method == "OPTIONS":
                 return "", 200
             
@@ -116,7 +115,7 @@ def init_db():
         )
     """)
 
-    # --- AUTO-MIGRATION ---
+    # --- AUTO-MIGRATION COMPANIES ---
     cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS group_name TEXT DEFAULT ''")
     cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS information TEXT DEFAULT '{}'")
 
@@ -137,9 +136,13 @@ def init_db():
             description TEXT,
             action_taken TEXT,
             status TEXT,
-            operator TEXT
+            operator TEXT,
+            resolution TEXT DEFAULT ''
         )
     """)
+
+    # --- AUTO-MIGRATION INCIDENTS (NEW FIELD) ---
+    cursor.execute("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS resolution TEXT DEFAULT ''")
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -360,7 +363,8 @@ def get_incidents():
     
     conn = get_connection()
     cursor = conn.cursor()
-    query = "SELECT id, timestamp, shift, category, company, description, action_taken, status, operator FROM incidents WHERE 1=1"
+    # Updated to include resolution in selection
+    query = "SELECT id, timestamp, shift, category, company, description, action_taken, status, operator, resolution FROM incidents WHERE 1=1"
     params = []
     if company: query += " AND company = %s"; params.append(company)
     if category: query += " AND category = %s"; params.append(category)
@@ -377,7 +381,7 @@ def get_incidents():
     rows = cursor.fetchall()
     cursor.close()
     release_connection(conn)
-    return jsonify([{"id":r[0],"timestamp":r[1],"shift":r[2],"category":r[3],"company":r[4],"description":r[5],"action_taken":r[6],"status":r[7],"operator":r[8]} for r in rows])
+    return jsonify([{"id":r[0],"timestamp":r[1],"shift":r[2],"category":r[3],"company":r[4],"description":r[5],"action_taken":r[6],"status":r[7],"operator":r[8],"resolution":r[9]} for r in rows])
 
 @app.route("/incidents", methods=["POST", "OPTIONS"])
 def create_incident():
@@ -391,8 +395,8 @@ def create_incident():
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO incidents (id, timestamp, shift, category, company, description, action_taken, status, operator) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-        (incident_id, timestamp, data.get("shift"), data.get("category"), data.get("company"), data.get("description"), data.get("action_taken"), data.get("status", "Pending"), data.get("operator")))
+    cursor.execute("INSERT INTO incidents (id, timestamp, shift, category, company, description, action_taken, status, operator, resolution) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        (incident_id, timestamp, data.get("shift"), data.get("category"), data.get("company"), data.get("description"), data.get("action_taken"), data.get("status", "Pending"), data.get("operator"), ""))
     conn.commit()
     cursor.close()
     release_connection(conn)
@@ -416,9 +420,13 @@ def update_incident(incident_id):
 def update_status_only(incident_id):
     if request.method == "OPTIONS": return "", 200
     data = request.json
+    status = data.get("status")
+    resolution = data.get("resolution", "")
+    
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("UPDATE incidents SET status = %s WHERE id = %s", (data.get("status"), incident_id))
+    # Updated to save the resolution text
+    cursor.execute("UPDATE incidents SET status = %s, resolution = %s WHERE id = %s", (status, resolution, incident_id))
     conn.commit()
     cursor.close()
     release_connection(conn)

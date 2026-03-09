@@ -15,7 +15,7 @@ function App() {
   const [editingIncident, setEditingIncident] = useState(null);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [activityLog, setActivityLog] = useState([]); 
-  const [isLogOpen, setIsLogOpen] = useState(false); // ✅ Logic for Drawer State
+  const [isLogOpen, setIsLogOpen] = useState(false);
   
   const [user, setUser] = useState(() => {
     const storedUser = localStorage.getItem("user");
@@ -71,19 +71,38 @@ function App() {
       if (response.ok) {
         const created = await response.json();
         setIncidents(prev => [created, ...prev]);
+        addLog("CREATED", created);
         loadData();
       }
     } catch (error) { console.error(error); }
   };
 
-  const updateStatus = async (id, newStatus) => {
+  /* =========================================
+     FIXED: Removed window.prompt notification
+     Now accepts resolutionText from IncidentRow
+     ========================================= */
+  const updateStatus = async (id, newStatus, resolutionText = "") => {
+    // Logic: If status is Resolved, resolutionText will be provided by our custom modal.
+    // If it's empty but status is Resolved, we use a fallback to keep logic intact.
+    const finalResolution = newStatus === "Resolved" && !resolutionText 
+      ? "Resolved without specific notes." 
+      : resolutionText;
+
     try {
-      await fetch(`${API_URL}/incidents/${id}/status`, {
+      const response = await fetch(`${API_URL}/incidents/${id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Role: user.role, Username: user.username },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ 
+            status: newStatus, 
+            resolution: finalResolution 
+        }),
       });
-      setIncidents(prev => prev.map(i => i.id === id ? { ...i, status: newStatus } : i));
+
+      if (response.ok) {
+        setIncidents(prev => prev.map(i => i.id === id ? { ...i, status: newStatus, resolution: finalResolution } : i));
+        const target = incidents.find(i => i.id === id);
+        if (target) addLog(newStatus.toUpperCase(), target);
+      }
     } catch (error) { console.error(error); }
   };
 
@@ -164,12 +183,10 @@ function App() {
         {activeTab === "analytics" && <Analytics incidents={incidents} />}
         {activeTab === "users" && user.role === "admin" && <div className="view-fade-in"><AdminPanel user={user} /></div>}
 
-        {/* ✅ Activity Toggle Button */}
         <button className="log-floating-btn" onClick={() => setIsLogOpen(true)}>
           📜 Activity {activityLog.length > 0 && <span className="log-count">{activityLog.length}</span>}
         </button>
 
-        {/* ✅ Slide-out Activity Drawer */}
         <div className={`activity-drawer ${isLogOpen ? "open" : ""}`}>
           <div className="drawer-header">
             <h3>Recent Activity</h3>
