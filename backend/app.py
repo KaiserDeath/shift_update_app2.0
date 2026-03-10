@@ -524,6 +524,7 @@ def delete_user(username):
     release_connection(conn)
     return jsonify({"message": "User deleted"})
 
+
 @app.route("/")
 def home():
     return jsonify({"message": "Backend is running"})
