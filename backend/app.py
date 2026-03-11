@@ -101,7 +101,7 @@ def init_db():
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Base Tables
+    # Companies Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS companies (
             id SERIAL PRIMARY KEY,
@@ -113,15 +113,17 @@ def init_db():
     cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS group_name TEXT DEFAULT ''")
     cursor.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS information TEXT DEFAULT '{}'")
 
+    # Categories Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS categories (
             id SERIAL PRIMARY KEY,
-            name TEXT UNIQUE NOT NULL
+            name TEXT UNIQUE NOT NULL,
+            private BOOLEAN DEFAULT FALSE
         )
     """)
-    # --- ADD PRIVATE COLUMN ---
     cursor.execute("ALTER TABLE categories ADD COLUMN IF NOT EXISTS private BOOLEAN DEFAULT FALSE")
 
+    # Incidents Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS incidents (
             id TEXT PRIMARY KEY,
@@ -138,6 +140,7 @@ def init_db():
     """)
     cursor.execute("ALTER TABLE incidents ADD COLUMN IF NOT EXISTS resolution TEXT DEFAULT ''")
 
+    # Users Table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id SERIAL PRIMARY KEY,
@@ -147,6 +150,19 @@ def init_db():
         )
     """)
 
+    # --- NEW: Activity Log Table ---
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS activity_log (
+            id SERIAL PRIMARY KEY,
+            action TEXT NOT NULL,
+            title TEXT NOT NULL,
+            operator TEXT NOT NULL,
+            category TEXT,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Default Data
     default_companies = ["Play Play Play", "Lucky Lady", "WiseGang", "Ballerz", "Fast Fortunes"]
     for company in default_companies:
         cursor.execute("INSERT INTO companies (name) VALUES (%s) ON CONFLICT (name) DO NOTHING", (company,))
@@ -160,6 +176,47 @@ def init_db():
     release_connection(conn)
 
 init_db()
+
+# =============================
+# ACTIVITY LOG ROUTES
+# =============================
+# MODIFIED: Added OPTIONS method and handler to fix CORS preflight error
+@app.route("/activity-log", methods=["GET", "OPTIONS"])
+def get_activity_log():
+    if request.method == "OPTIONS":
+        return "", 200
+
+    role = request.headers.get("Role")
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    # Filter private categories for operators
+    if role == "operator":
+        cursor.execute("SELECT name FROM categories WHERE private = TRUE")
+        private_cats = [r[0] for r in cursor.fetchall()]
+        
+        query = "SELECT action, title, operator, timestamp FROM activity_log"
+        if private_cats:
+            placeholders = ",".join(["%s"] * len(private_cats))
+            query += f" WHERE category NOT IN ({placeholders}) OR category IS NULL"
+        
+        query += " ORDER BY timestamp DESC LIMIT 50"
+        cursor.execute(query, tuple(private_cats) if private_cats else ())
+    else:
+        cursor.execute("SELECT action, title, operator, timestamp FROM activity_log ORDER BY timestamp DESC LIMIT 50")
+    
+    rows = cursor.fetchall()
+    cursor.close()
+    release_connection(conn)
+
+    return jsonify([
+        {
+            "action": r[0],
+            "title": r[1],
+            "operator": r[2],
+            "time": r[3].strftime("%H:%M:%S") if r[3] else ""
+        } for r in rows
+    ])
 
 # =============================
 # ADMIN CREATE USER
@@ -341,16 +398,14 @@ def get_incidents():
     shift = request.args.get("shift")
     status = request.args.get("status")
     operator = request.args.get("operator")
-    role = request.headers.get("Role")  # <-- NEW: get Role from frontend
+    role = request.headers.get("Role")
 
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Fetch categories with privacy info
     cursor.execute("SELECT name, private FROM categories")
     categories = {name: private for name, private in cursor.fetchall()}
 
-    # Base query
     query = "SELECT id, timestamp, shift, category, company, description, action_taken, status, operator, resolution FROM incidents WHERE 1=1"
     params = []
 
@@ -364,7 +419,6 @@ def get_incidents():
     if date_from: query += " AND timestamp >= %s"; params.append(f"{date_from} 00:00:00")
     if date_to: query += " AND timestamp <= %s"; params.append(f"{date_to} 23:59:59")
 
-    # Filter private categories for operators
     if role == "operator":
         private_cats = [name for name, private in categories.items() if private]
         if private_cats:
@@ -384,9 +438,6 @@ def get_incidents():
         for r in rows
     ])
 
-# =============================
-# OTHER INCIDENT ROUTES
-# =============================
 @app.route("/incidents", methods=["POST", "OPTIONS"])
 def create_incident():
     if request.method == "OPTIONS": return "", 200
@@ -399,9 +450,16 @@ def create_incident():
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_connection()
     cursor = conn.cursor()
+    
     cursor.execute("INSERT INTO incidents (id, timestamp, shift, category, company, description, action_taken, status, operator, resolution) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
         (incident_id, timestamp, data.get("shift"), data.get("category"), data.get("company"), data.get("description"),
          data.get("action_taken"), data.get("status", "Pending"), data.get("operator"), ""))
+    
+    # Log the creation
+    log_title = f"{data.get('company')}: {data.get('description')[:30]}"
+    cursor.execute("INSERT INTO activity_log (action, title, operator, category) VALUES (%s, %s, %s, %s)",
+                   ("CREATED", log_title, data.get("operator"), data.get("category")))
+    
     conn.commit()
     cursor.close()
     release_connection(conn)
@@ -414,9 +472,16 @@ def update_incident(incident_id):
     new_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     conn = get_connection()
     cursor = conn.cursor()
+    
     cursor.execute("UPDATE incidents SET timestamp=%s, shift=%s, category=%s, company=%s, description=%s, action_taken=%s, status=%s, operator=%s WHERE id=%s",
         (new_ts, data.get("shift"), data.get("category"), data.get("company"), data.get("description"),
          data.get("action_taken"), data.get("status"), data.get("operator"), incident_id))
+    
+    # Log the edit
+    log_title = f"{data.get('company')}: {data.get('description')[:30]}"
+    cursor.execute("INSERT INTO activity_log (action, title, operator, category) VALUES (%s, %s, %s, %s)",
+                   ("EDITED", log_title, data.get("operator"), data.get("category")))
+
     conn.commit()
     cursor.close()
     release_connection(conn)
@@ -428,9 +493,22 @@ def update_status_only(incident_id):
     data = request.json
     status = data.get("status")
     resolution = data.get("resolution", "")
+    username = request.headers.get("Username", "Unknown")
+    
     conn = get_connection()
     cursor = conn.cursor()
+    
+    # Get incident info for logging before update
+    cursor.execute("SELECT company, description, category FROM incidents WHERE id = %s", (incident_id,))
+    inc = cursor.fetchone()
+    
     cursor.execute("UPDATE incidents SET status=%s, resolution=%s WHERE id=%s", (status, resolution, incident_id))
+    
+    if inc:
+        log_title = f"{inc[0]}: {inc[1][:30]}"
+        cursor.execute("INSERT INTO activity_log (action, title, operator, category) VALUES (%s, %s, %s, %s)",
+                       (status.upper(), log_title, username, inc[2]))
+
     conn.commit()
     cursor.close()
     release_connection(conn)
@@ -439,9 +517,21 @@ def update_status_only(incident_id):
 @app.route("/incidents/<incident_id>", methods=["DELETE", "OPTIONS"])
 def delete_incident(incident_id):
     if request.method == "OPTIONS": return "", 200
+    username = request.headers.get("Username", "Unknown")
     conn = get_connection()
     cursor = conn.cursor()
+    
+    # Get incident info for logging
+    cursor.execute("SELECT company, description, category FROM incidents WHERE id = %s", (incident_id,))
+    inc = cursor.fetchone()
+    
     cursor.execute("DELETE FROM incidents WHERE id=%s", (incident_id,))
+    
+    if inc:
+        log_title = f"{inc[0]}: {inc[1][:30]}"
+        cursor.execute("INSERT INTO activity_log (action, title, operator, category) VALUES (%s, %s, %s, %s)",
+                       ("DELETED", log_title, username, inc[2]))
+
     conn.commit()
     cursor.close()
     release_connection(conn)
@@ -523,7 +613,6 @@ def delete_user(username):
     cursor.close()
     release_connection(conn)
     return jsonify({"message": "User deleted"})
-
 
 @app.route("/")
 def home():

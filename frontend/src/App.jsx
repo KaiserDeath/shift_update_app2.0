@@ -40,14 +40,22 @@ function App() {
       const query = new URLSearchParams(cleanFilters).toString();
       const headers = { Role: user.role, Username: user.username };
 
-      const [incRes, compRes, catRes] = await Promise.all([
+      // Added activity-log to the parallel fetch
+      const [incRes, compRes, catRes, logRes] = await Promise.all([
         fetch(`${API_URL}/incidents?${query}`, { headers }),
         fetch(`${API_URL}/companies`, { headers }),
-        fetch(`${API_URL}/categories`, { headers })
+        fetch(`${API_URL}/categories`, { headers }),
+        fetch(`${API_URL}/activity-log`, { headers }).catch(() => null) // Prevent crash if log route fails
       ]);
 
       let rawIncidents = await incRes.json();
       let rawCategories = await catRes.json();
+      
+      // Update Activity Log from Database
+      if (logRes && logRes.ok) {
+        const dbLogs = await logRes.json();
+        setActivityLog(dbLogs);
+      }
 
       // Normalize all categories into objects { name, private }
       const normalizedCategories = rawCategories.map(c =>
@@ -55,17 +63,11 @@ function App() {
       );
 
       if (user.role === "operator") {
-        // 1. Identify which categories are allowed (NOT private)
         const allowedCategories = normalizedCategories.filter(c => !c.private);
         const allowedNames = allowedCategories.map(c => c.name);
-
-        // 2. Filter incidents: Only show incidents whose category is in the allowed list
         setIncidents(rawIncidents.filter(i => allowedNames.includes(i.category)));
-
-        // 3. Filter categories state: Operators will NEVER see private categories in dropdowns/filters
         setCategories(allowedCategories);
       } else {
-        // Admin/Supervisor see everything
         setIncidents(rawIncidents);
         setCategories(normalizedCategories);
       }
@@ -76,15 +78,16 @@ function App() {
     }
   };
 
+  // Keeps the session snappy by updating UI immediately while waiting for DB sync
   const addLog = (action, incident) => {
     const newLog = {
       id: Date.now(),
       action,
       title: (incident.company || "Unknown") + ": " + (incident.description?.substring(0, 30) || "No desc"),
       operator: user.username,
-      time: new Date().toLocaleTimeString()
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
     };
-    setActivityLog(prev => [newLog, ...prev].slice(0, 20));
+    setActivityLog(prev => [newLog, ...prev].slice(0, 50));
   };
 
   const addIncident = async (incident) => {
@@ -116,9 +119,9 @@ function App() {
       });
 
       if (response.ok) {
-        await loadData();
         const target = incidents.find(i => i.id === id);
         if (target) addLog(newStatus.toUpperCase(), target);
+        await loadData();
       }
     } catch (error) { console.error(error); }
   };
@@ -133,6 +136,7 @@ function App() {
     if (res.ok) {
       addLog("DELETED", target);
       setIncidents(prev => prev.filter(i => i.id !== id));
+      loadData(); // Sync logs from server
     }
   };
 
@@ -218,9 +222,6 @@ function App() {
               </select>
               <select value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}>
                 <option value="">All Categories</option>
-                {/* Because we filtered 'categories' in loadData, 
-                   this will only show public options to Operators 
-                */}
                 {categories.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
               </select>
               <input type="text" placeholder="Search..." value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} />
@@ -256,8 +257,8 @@ function App() {
         <div className={`activity-drawer ${isLogOpen ? "open" : ""}`}>
           <div className="drawer-header"><h3>Recent Activity</h3><button className="close-drawer" onClick={() => setIsLogOpen(false)}>✕</button></div>
           <div className="drawer-body">
-            {activityLog.length === 0 ? <p className="empty-log">No history in this session.</p> : activityLog.map((log) => (
-              <div key={log.id} className="log-entry">
+            {activityLog.length === 0 ? <p className="empty-log">No history found.</p> : activityLog.map((log, idx) => (
+              <div key={log.id || idx} className="log-entry">
                 <div className="log-row">
                   <span className={`log-action-tag ${log.action.toLowerCase()}`}>{log.action}</span>
                   <span className="log-time">{log.time}</span>
