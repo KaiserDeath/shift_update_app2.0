@@ -75,11 +75,10 @@ function IncidentForm({
 
       // Fetch updated categories from server
       const updated = await fetch(`${API_URL}/categories`).then(r => r.json());
-      // Normalize to objects { name, private }
       const normalized = updated.map(c => (typeof c === "string" ? { name: c, private: false } : { name: c.name, private: c.private ?? false }));
       setCategories(normalized);
 
-      // Immediately update formData so select shows the new category
+      // Update formData so select shows the new category
       setFormData(prev => ({ ...prev, category: newCategoryName.trim() }));
       setShowCategoryModal(false);
     } catch (err) {
@@ -151,7 +150,17 @@ function IncidentForm({
             {categories
               .filter(cat => (role === "operator" ? !cat.private : true))
               .map((cat, i) => (
-                <option key={i} value={cat.name}>{cat.name}</option>
+                <option
+                  key={i}
+                  value={cat.name}
+                  style={{
+                    fontWeight: cat.private ? "bold" : "normal",
+                    color: cat.private ? "#d9534f" : "inherit"
+                  }}
+                  title={cat.private ? "Private: Only visible to supervisors/admins" : ""}
+                >
+                  {cat.name} {cat.private ? "🔒" : ""}
+                </option>
               ))
             }
             {role !== "operator" && <option value="ADD_NEW_CATEGORY">➕ Add Category</option>}
