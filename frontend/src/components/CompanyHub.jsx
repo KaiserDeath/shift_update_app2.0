@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, memo, useCallback } from "react";
+import Popup from "./Popup";
 
 // --- MEMOIZED SIDEBAR COMPONENT ---
 const Sidebar = memo(({ companies, selectedCompany, setSelectedCompany, isAdmin, setShowQuickAdd, favorites, toggleFavorite }) => {
@@ -79,6 +80,17 @@ const CompanyHub = ({ companies, setCompanies, API_URL, user }) => {
   const [quickName, setQuickName] = useState("");
   const [showLibraryManager, setShowLibraryManager] = useState(false);
 
+  // Popup state
+  const [popupState, setPopupState] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "alert",
+    onConfirm: () => {},
+  });
+
+  const closePopup = () => setPopupState(prev => ({ ...prev, isOpen: false }));
+
   // --- METHOD LIBRARY STATE ---
   const [methodLibrary, setMethodLibrary] = useState(() => {
     const saved = localStorage.getItem("hub_method_library");
@@ -93,17 +105,36 @@ const CompanyHub = ({ companies, setCompanies, API_URL, user }) => {
     const exists = methodLibrary.find(m => m.label === method.label && m.provider === method.provider);
     if (!exists) {
       setMethodLibrary([...methodLibrary, { ...method }]);
-      alert("Method saved to your global library!");
+      setPopupState({
+        isOpen: true,
+        title: "Success",
+        message: "Method saved to your global library!",
+        type: "alert",
+        onConfirm: closePopup
+      });
     } else {
-      alert("This method is already in your library.");
+      setPopupState({
+        isOpen: true,
+        title: "Info",
+        message: "This method is already in your library.",
+        type: "alert",
+        onConfirm: closePopup
+      });
     }
   };
 
   const removeFromLibrary = (index) => {
-    if (window.confirm("Remove this template from your library?")) {
-      const updated = methodLibrary.filter((_, idx) => idx !== index);
-      setMethodLibrary(updated);
-    }
+    setPopupState({
+      isOpen: true,
+      title: "Confirm Removal",
+      message: "Remove this template from your library?",
+      type: "confirm",
+      onConfirm: () => {
+        closePopup();
+        const updated = methodLibrary.filter((_, idx) => idx !== index);
+        setMethodLibrary(updated);
+      }
+    });
   };
 
   const [favorites, setFavorites] = useState(() => {
@@ -159,7 +190,13 @@ const CompanyHub = ({ companies, setCompanies, API_URL, user }) => {
   const copyToClipboard = (text) => {
     if (!text) return;
     navigator.clipboard.writeText(text);
-    alert("Copied to clipboard!");
+    setPopupState({
+      isOpen: true,
+      title: "Success",
+      message: "Copied to clipboard!",
+      type: "alert",
+      onConfirm: closePopup
+    });
   };
 
   const handleQuickAdd = async () => {
@@ -229,17 +266,25 @@ const CompanyHub = ({ companies, setCompanies, API_URL, user }) => {
     </div>
   );
 
-  const handleDeleteCompany = async () => {
-    if (!window.confirm(`Are you sure you want to delete ${selectedCompany}?`)) return;
-    const res = await fetch(`${API_URL}/companies/${encodeURIComponent(selectedCompany)}`, {
-        method: "DELETE",
-        headers: { Role: user.role, Username: user.username }
+  const handleDeleteCompany = () => {
+    setPopupState({
+      isOpen: true,
+      title: "Confirm Deletion",
+      message: `Are you sure you want to delete ${selectedCompany}?`,
+      type: "confirm",
+      onConfirm: async () => {
+        closePopup();
+        const res = await fetch(`${API_URL}/companies/${encodeURIComponent(selectedCompany)}`, {
+            method: "DELETE",
+            headers: { Role: user.role, Username: user.username }
+        });
+        if (res.ok) {
+            setCompanies(await fetch(`${API_URL}/companies`).then(r => r.json()));
+            setSelectedCompany(null);
+            setActiveModal(null);
+        }
+      }
     });
-    if (res.ok) {
-        setCompanies(await fetch(`${API_URL}/companies`).then(r => r.json()));
-        setSelectedCompany(null);
-        setActiveModal(null);
-    }
   };
 
   return (
@@ -371,12 +416,19 @@ const CompanyHub = ({ companies, setCompanies, API_URL, user }) => {
                                   <>
                                     <button onClick={() => setEditingGameIndex(i)} style={{ fontSize: "11px", background: "rgba(255,255,255,0.1)" }}>Edit</button>
                                     <button onClick={() => {
-                                        if (window.confirm("Delete this?")) {
-                                            const updated = formData.game_credentials.filter((_, idx) => idx !== i);
-                                            const newData = { ...formData, game_credentials: updated };
-                                            setFormData(newData);
-                                            handleSave(newData);
-                                        }
+                                        setPopupState({
+                                          isOpen: true,
+                                          title: "Confirm Deletion",
+                                          message: "Delete this credential?",
+                                          type: "confirm",
+                                          onConfirm: () => {
+                                              closePopup();
+                                              const updated = formData.game_credentials.filter((_, idx) => idx !== i);
+                                              const newData = { ...formData, game_credentials: updated };
+                                              setFormData(newData);
+                                              handleSave(newData);
+                                          }
+                                        });
                                     }} style={{ fontSize: "11px", background: "rgba(255,77,77,0.2)", color: "#ff4d4d" }}>Delete</button>
                                   </>
                                 )}
@@ -475,13 +527,20 @@ const CompanyHub = ({ companies, setCompanies, API_URL, user }) => {
                                   <div style={{ display: "flex", gap: "8px" }}>
                                     <button onClick={() => activeModal === "deposits" ? setEditingDepositIndex(i) : setEditingCashoutIndex(i)} style={{ fontSize: "11px" }}>Edit</button>
                                     <button onClick={() => {
-                                      if (window.confirm("Delete this?")) {
-                                        const field = activeModal === "deposits" ? "deposit_methods" : "cashout_methods";
-                                        const updated = formData[field].filter((_, idx) => idx !== i);
-                                        const newData = { ...formData, [field]: updated };
-                                        setFormData(newData);
-                                        handleSave(newData);
-                                      }
+                                      setPopupState({
+                                        isOpen: true,
+                                        title: "Confirm Deletion",
+                                        message: "Delete this method?",
+                                        type: "confirm",
+                                        onConfirm: () => {
+                                          closePopup();
+                                          const field = activeModal === "deposits" ? "deposit_methods" : "cashout_methods";
+                                          const updated = formData[field].filter((_, idx) => idx !== i);
+                                          const newData = { ...formData, [field]: updated };
+                                          setFormData(newData);
+                                          handleSave(newData);
+                                        }
+                                      });
                                     }} style={{ fontSize: "11px", background: "rgba(255,77,77,0.2)", color: "#ff4d4d" }}>Delete</button>
                                   </div>
                                 )}
@@ -570,6 +629,15 @@ const CompanyHub = ({ companies, setCompanies, API_URL, user }) => {
           </div>
         </div>
       )}
+
+      <Popup 
+        isOpen={popupState.isOpen}
+        onClose={closePopup}
+        title={popupState.title}
+        message={popupState.message}
+        type={popupState.type}
+        onConfirm={popupState.onConfirm}
+      />
     </div>
   );
 };

@@ -27,6 +27,16 @@
   --status-progress: #eab308;
   --status-closed: #16a34a;
   --status-important: #ea580c;
+  
+  /* STATUS BACKGROUNDS (TINTED) */
+  --status-important-bg: rgba(234, 88, 12, 0.6);
+  --status-progress-bg: rgba(234, 179, 8, 0.6);
+  --status-closed-bg: rgba(22, 163, 74, 0.6);
+
+  /* STATUS BACKGROUNDS FOR ROWS (LIGHT TINT) */
+  --status-important-row-bg: rgba(234, 88, 12, 0.1);
+  --status-progress-row-bg: rgba(234, 179, 8, 0.1);
+  --status-closed-row-bg: rgba(22, 163, 74, 0.1);
 }
 
 /* DARK MODE */
@@ -45,6 +55,16 @@ body.dark {
   --status-progress: #fde047;
   --status-closed: #4ade80;
   --status-important: #fb923c;
+  
+  /* Deeper headers for dark mode */
+  --status-important-bg: rgba(251, 146, 60, 0.65);
+  --status-progress-bg: rgba(253, 224, 71, 0.65);
+  --status-closed-bg: rgba(74, 222, 128, 0.65);
+
+  /* Light offset for body rows */
+  --status-important-row-bg: rgba(251, 146, 60, 0.15);
+  --status-progress-row-bg: rgba(253, 224, 71, 0.15);
+  --status-closed-row-bg: rgba(74, 222, 128, 0.15);
 }
 
 /* =========================================
@@ -204,15 +224,26 @@ button:hover {
 .incident-table-container { margin-bottom: 40px; overflow: hidden; padding-bottom: 10px; }
 .incident-table-container h3 { padding: 20px; font-size: 18px; color: var(--primary); }
 
-table { width: 100%; border-collapse: collapse; }
-thead { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; }
-th { padding: 16px 15px; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; text-align: left; }
+table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 12px; }
+thead { background: var(--glass-strong); color: var(--text); border-bottom: 2px solid var(--glass-border); }
+th { padding: 16px 15px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; text-align: left; font-weight: 700; color: var(--text); }
 td { padding: 15px; font-size: 14px; border-bottom: 1px solid var(--glass-border); }
-tr:hover td { background: var(--glass-strong); }
+tr:hover td { filter: brightness(1.1); }
 
-.incident-table.important thead { background: linear-gradient(135deg, #fb923c, #ea580c); }
-.incident-table.pending thead { background: linear-gradient(135deg, #facc15, #f59e0b); }
-.incident-table.resolved thead { background: linear-gradient(135deg, #22c55e, #16a34a); }
+/* IMPORTANT TABLE */
+.incident-table.important thead { background: var(--status-important-bg); border-bottom-color: var(--status-important); }
+.incident-table.important th { color: #fff; text-shadow: 0px 1px 2px rgba(0,0,0,0.5); }
+.incident-table.important tbody tr { background: var(--status-important-row-bg); }
+
+/* PENDING TABLE */
+.incident-table.pending thead { background: var(--status-progress-bg); border-bottom-color: var(--status-progress); }
+.incident-table.pending th { color: #fff; text-shadow: 0px 1px 2px rgba(0,0,0,0.5); }
+.incident-table.pending tbody tr { background: var(--status-progress-row-bg); }
+
+/* RESOLVED TABLE */
+.incident-table.resolved thead { background: var(--status-closed-bg); border-bottom-color: var(--status-closed); }
+.incident-table.resolved th { color: #fff; text-shadow: 0px 1px 2px rgba(0,0,0,0.5); }
+.incident-table.resolved tbody tr { background: var(--status-closed-row-bg); }
 
 .status-select { font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 8px; }
 .status-select.pending { border-left: 4px solid var(--status-progress); }

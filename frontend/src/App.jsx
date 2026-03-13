@@ -5,6 +5,7 @@ import Login from "./components/Login";
 import AdminPanel from "./components/AdminPanel";
 import Analytics from "./components/Analytics";
 import CompanyHub from "./components/CompanyHub";
+import Popup from "./components/Popup";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
 
@@ -16,6 +17,17 @@ function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [activityLog, setActivityLog] = useState([]);
   const [isLogOpen, setIsLogOpen] = useState(false);
+
+  // Popup state
+  const [popupState, setPopupState] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "alert",
+    onConfirm: () => {},
+  });
+
+  const closePopup = () => setPopupState(prev => ({ ...prev, isOpen: false }));
 
   const [user, setUser] = useState(() => {
     const storedUser = localStorage.getItem("user");
@@ -126,18 +138,26 @@ function App() {
     } catch (error) { console.error(error); }
   };
 
-  const deleteIncident = async (id) => {
+  const deleteIncident = (id) => {
     const target = incidents.find(i => i.id === id);
-    if (!window.confirm("Delete this incident?")) return;
-    const res = await fetch(`${API_URL}/incidents/${id}`, {
-      method: "DELETE",
-      headers: { Role: user.role, Username: user.username },
+    setPopupState({
+      isOpen: true,
+      title: "Confirm Deletion",
+      message: "Delete this incident?",
+      type: "confirm",
+      onConfirm: async () => {
+        closePopup();
+        const res = await fetch(`${API_URL}/incidents/${id}`, {
+          method: "DELETE",
+          headers: { Role: user.role, Username: user.username },
+        });
+        if (res.ok) {
+          addLog("DELETED", target);
+          setIncidents(prev => prev.filter(i => i.id !== id));
+          loadData(); // Sync logs from server
+        }
+      }
     });
-    if (res.ok) {
-      addLog("DELETED", target);
-      setIncidents(prev => prev.filter(i => i.id !== id));
-      loadData(); // Sync logs from server
-    }
   };
 
   const updateIncident = async (updatedIncident) => {
@@ -271,6 +291,15 @@ function App() {
         </div>
         {isLogOpen && <div className="drawer-overlay" onClick={() => setIsLogOpen(false)}></div>}
       </main>
+
+      <Popup 
+        isOpen={popupState.isOpen}
+        onClose={closePopup}
+        title={popupState.title}
+        message={popupState.message}
+        type={popupState.type}
+        onConfirm={popupState.onConfirm}
+      />
     </div>
   );
 }

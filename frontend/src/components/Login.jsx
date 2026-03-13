@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Popup from "./Popup";
 
 // Dynamically get API URL from env, fallback to localhost
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
@@ -6,6 +7,17 @@ const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
 function Login({ onLogin }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+
+  // Popup state
+  const [popupState, setPopupState] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "alert",
+    onConfirm: () => {},
+  });
+
+  const closePopup = () => setPopupState(prev => ({ ...prev, isOpen: false }));
 
   // Check if user is already logged in
   useEffect(() => {
@@ -17,7 +29,13 @@ function Login({ onLogin }) {
 
   const handleLogin = async () => {
     if (!username || !password) {
-      alert("Username and password required");
+      setPopupState({
+        isOpen: true,
+        title: "Input Required",
+        message: "Username and password required",
+        type: "alert",
+        onConfirm: closePopup
+      });
       return;
     }
 
@@ -35,11 +53,23 @@ function Login({ onLogin }) {
         localStorage.setItem("user", JSON.stringify(data));
         onLogin(data);
       } else {
-        alert(data.error);
+        setPopupState({
+          isOpen: true,
+          title: "Login Failed",
+          message: data.error,
+          type: "alert",
+          onConfirm: closePopup
+        });
       }
     } catch (err) {
       console.error("Login error:", err);
-      alert("Server error. Try again.");
+      setPopupState({
+        isOpen: true,
+        title: "Error",
+        message: "Server error. Try again.",
+        type: "alert",
+        onConfirm: closePopup
+      });
     }
   };
 
@@ -68,6 +98,15 @@ function Login({ onLogin }) {
       >
         Login
       </button>
+
+      <Popup 
+        isOpen={popupState.isOpen}
+        onClose={closePopup}
+        title={popupState.title}
+        message={popupState.message}
+        type={popupState.type}
+        onConfirm={popupState.onConfirm}
+      />
     </div>
   );
 }

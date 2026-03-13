@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import Popup from "./Popup";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
 
@@ -25,6 +26,17 @@ function IncidentForm({
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryPrivate, setNewCategoryPrivate] = useState(false);
+
+  // Popup state
+  const [popupState, setPopupState] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "alert",
+    onConfirm: () => {},
+  });
+
+  const closePopup = () => setPopupState(prev => ({ ...prev, isOpen: false }));
 
   const isValidName = (name) => {
     if (!name) return false;
@@ -62,7 +74,16 @@ function IncidentForm({
   };
 
   const handleAddCategory = async () => {
-    if (!isValidName(newCategoryName)) return alert("Invalid category name");
+    if (!isValidName(newCategoryName)) {
+      setPopupState({
+        isOpen: true,
+        title: "Error",
+        message: "Invalid category name",
+        type: "alert",
+        onConfirm: closePopup
+      });
+      return;
+    }
 
     try {
       const res = await fetch(`${API_URL}/categories`, {
@@ -83,33 +104,63 @@ function IncidentForm({
       setShowCategoryModal(false);
     } catch (err) {
       console.error(err);
-      alert("Error creating category");
+      setPopupState({
+        isOpen: true,
+        title: "Error",
+        message: "Error creating category",
+        type: "alert",
+        onConfirm: closePopup
+      });
     }
   };
 
   const handleDeleteCategory = async () => {
     if (!formData.category || formData.category === "ADD_NEW_CATEGORY") return;
-    if (!window.confirm(`Delete "${formData.category}"?`)) return;
+    
+    setPopupState({
+      isOpen: true,
+      title: "Confirm Deletion",
+      message: `Delete "${formData.category}"?`,
+      type: "confirm",
+      onConfirm: async () => {
+        closePopup();
+        try {
+          const response = await fetch(`${API_URL}/categories/${encodeURIComponent(formData.category)}`, {
+            method: "DELETE",
+            headers: { "Username": operator }
+          });
 
-    try {
-      const response = await fetch(`${API_URL}/categories/${encodeURIComponent(formData.category)}`, {
-        method: "DELETE",
-        headers: { "Username": operator }
-      });
+          if (!response.ok) {
+            setTimeout(() => {
+              setPopupState({
+                isOpen: true,
+                title: "Error",
+                message: "Cannot delete: category in use",
+                type: "alert",
+                onConfirm: closePopup
+              });
+            }, 300);
+            return;
+          }
 
-      if (!response.ok) {
-        alert("Cannot delete: category in use");
-        return;
+          const updated = await fetch(`${API_URL}/categories`).then(res => res.json());
+          const normalized = updated.map(c => (typeof c === "string" ? { name: c, private: false } : { name: c.name, private: c.private ?? false }));
+          setCategories(normalized);
+          setFormData(prev => ({ ...prev, category: "" }));
+        } catch (error) {
+          console.error("Server error:", error);
+          setTimeout(() => {
+            setPopupState({
+              isOpen: true,
+              title: "Error",
+              message: "Error connecting to server",
+              type: "alert",
+              onConfirm: closePopup
+            });
+          }, 300);
+        }
       }
-
-      const updated = await fetch(`${API_URL}/categories`).then(res => res.json());
-      const normalized = updated.map(c => (typeof c === "string" ? { name: c, private: false } : { name: c.name, private: c.private ?? false }));
-      setCategories(normalized);
-      setFormData(prev => ({ ...prev, category: "" }));
-    } catch (error) {
-      console.error("Server error:", error);
-      alert("Error connecting to server");
-    }
+    });
   };
 
   return (
@@ -220,6 +271,15 @@ function IncidentForm({
           </div>
         </div>
       )}
+
+      <Popup 
+        isOpen={popupState.isOpen}
+        onClose={closePopup}
+        title={popupState.title}
+        message={popupState.message}
+        type={popupState.type}
+        onConfirm={popupState.onConfirm}
+      />
     </>
   );
 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import Popup from "./Popup";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
 
@@ -10,6 +11,18 @@ const AdminPanel = ({ user }) => {
   const [message, setMessage] = useState("");
   const [users, setUsers] = useState([]);
   const [showUsers, setShowUsers] = useState(false);
+  
+  // Popup state
+  const [popupState, setPopupState] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "alert",
+    onConfirm: () => {},
+    inputValue: "",
+  });
+
+  const closePopup = () => setPopupState({ ...popupState, isOpen: false });
 
   // Fetch all users
   const fetchUsers = async () => {
@@ -48,31 +61,55 @@ const AdminPanel = ({ user }) => {
   };
 
   // Delete user
-  const deleteUser = async (usernameToDelete) => {
-    if (!window.confirm("Are you sure you want to delete this user?")) return;
-    try {
-      await axios.delete(`${API_URL}/admin/users/${usernameToDelete}`, {
-        headers: { Username: user.username }
-      });
-      fetchUsers();
-    } catch (err) {
-      console.error("Error deleting user:", err);
-    }
+  const deleteUser = (usernameToDelete) => {
+    setPopupState({
+      isOpen: true,
+      title: "Confirm Deletion",
+      message: "Are you sure you want to delete this user?",
+      type: "confirm",
+      onConfirm: async () => {
+        closePopup();
+        try {
+          await axios.delete(`${API_URL}/admin/users/${usernameToDelete}`, {
+            headers: { Username: user.username }
+          });
+          fetchUsers();
+        } catch (err) {
+          console.error("Error deleting user:", err);
+        }
+      }
+    });
   };
 
   // Reset password
-  const resetPassword = async (usernameToReset) => {
-    const newPass = prompt("Enter new password:");
-    if (!newPass) return;
-    try {
-      await axios.patch(`${API_URL}/admin/users/${usernameToReset}/password`, 
-        { password: newPass },
-        { headers: { Username: user.username } }
-      );
-      alert("Password reset successfully");
-    } catch (err) {
-      console.error("Error resetting password:", err);
-    }
+  const resetPassword = (usernameToReset) => {
+    setPopupState({
+      isOpen: true,
+      title: "Reset Password",
+      type: "prompt",
+      placeholder: "Enter new password",
+      onConfirm: async (newPass) => {
+        closePopup();
+        if (!newPass) return;
+        try {
+          await axios.patch(`${API_URL}/admin/users/${usernameToReset}/password`, 
+            { password: newPass },
+            { headers: { Username: user.username } }
+          );
+          setTimeout(() => {
+            setPopupState({
+              isOpen: true,
+              title: "Success",
+              message: "Password reset successfully",
+              type: "alert",
+              onConfirm: closePopup
+            });
+          }, 300);
+        } catch (err) {
+          console.error("Error resetting password:", err);
+        }
+      }
+    });
   };
 
   // Update role
@@ -162,6 +199,17 @@ const AdminPanel = ({ user }) => {
           </>
         )}
       </div>
+
+      <Popup 
+        isOpen={popupState.isOpen}
+        onClose={closePopup}
+        title={popupState.title}
+        message={popupState.message}
+        type={popupState.type}
+        onConfirm={popupState.onConfirm}
+        inputValue={popupState.inputValue}
+        placeholder={popupState.placeholder}
+      />
     </div>
   );
 };
